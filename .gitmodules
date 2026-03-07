@@ -1,0 +1,9 @@
+[submodule "reference/starter"]
+	path = reference/starter
+	url = git@github.com:urtimus-prime/starter.git
+[submodule "reference/number-guess"]
+	path = reference/number-guess
+	url = git@github.com:urtimus-prime/number-guess.git
+[submodule "reference/nums"]
+	path = reference/nums
+	url = git@github.com:urtimus-prime/nums.git
