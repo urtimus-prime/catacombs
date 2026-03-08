@@ -358,8 +358,12 @@ function App() {
                       {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} ↗
                     </a>
                   ) : (
-                    <span style={styles.txHash} title={log.txHash}>
-                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)}
+                    <span
+                      style={{ ...styles.txHash, cursor: "pointer" }}
+                      title="Click to copy full hash"
+                      onClick={() => navigator.clipboard.writeText(log.txHash)}
+                    >
+                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} ⧉
                     </span>
                   )}
                 </span>
