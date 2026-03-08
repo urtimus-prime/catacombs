@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [main, staging]
+    branches: [main, staging, production]
   workflow_dispatch:
 
 env:
@@ -12,7 +12,7 @@ env:
 jobs:
   deploy-client:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'staging' && 'staging' || 'free' }}
+    environment: ${{ github.ref_name == 'staging' && 'staging' || github.ref_name == 'production' && 'production' || 'free' }}
     permissions:
       contents: read
       packages: write
@@ -58,7 +58,7 @@ jobs:
             }'
 
   deploy-explorer:
-    if: github.ref_name != 'staging'
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     environment: free
     permissions:

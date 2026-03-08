@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from "react";
-import { sepolia } from "@starknet-react/chains";
+import { mainnet, sepolia } from "@starknet-react/chains";
 import { Chain } from "@starknet-react/chains";
 import {
   jsonRpcProvider,
@@ -64,9 +64,9 @@ function createKatanaBurner(): Connector {
   });
 }
 
-// --- Slot / Sepolia (production) ---
+// --- Controller (Sepolia / Mainnet) ---
 function createController(): Connector {
-  const chainId = CHAIN === "slot" ? SLOT_CHAIN_ID : constants.StarknetChainId.SN_SEPOLIA;
+  const chainId = CHAIN === "mainnet" ? constants.StarknetChainId.SN_MAIN : constants.StarknetChainId.SN_SEPOLIA;
   return new ControllerConnector({
     chains: [{ rpcUrl: RPC_URL }],
     defaultChainId: chainId,
@@ -94,9 +94,9 @@ const slotChain: Chain = {
   },
 } as Chain;
 
-const chain = CHAIN === "sepolia" ? sepolia : CHAIN === "slot" ? slotChain : katana;
-// Controller only works on Sepolia (account contracts pre-declared); Slot/Katana use burner
-const connectors = [CHAIN === "sepolia" ? createController() : createKatanaBurner()];
+const chain = CHAIN === "mainnet" ? mainnet : CHAIN === "sepolia" ? sepolia : CHAIN === "slot" ? slotChain : katana;
+// Controller works on Sepolia and Mainnet; Slot/Katana use burner
+const connectors = [CHAIN === "sepolia" || CHAIN === "mainnet" ? createController() : createKatanaBurner()];
 const provider = jsonRpcProvider({ rpc: () => ({ nodeUrl: RPC_URL }) });
 
 export default function StarknetProvider({ children }: PropsWithChildren) {

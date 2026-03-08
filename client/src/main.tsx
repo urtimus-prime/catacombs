@@ -17,7 +17,7 @@ async function main() {
     domain: {
       name: "catacombs",
       version: "1.0",
-      chainId: import.meta.env.VITE_CHAIN === "sepolia" ? "SN_SEPOLIA" : import.meta.env.VITE_CHAIN === "slot" ? "WP_CATACOMBS" : "KATANA",
+      chainId: import.meta.env.VITE_CHAIN === "mainnet" ? "SN_MAIN" : import.meta.env.VITE_CHAIN === "sepolia" ? "SN_SEPOLIA" : import.meta.env.VITE_CHAIN === "slot" ? "WP_CATACOMBS" : "KATANA",
       revision: "1",
     },
   });
