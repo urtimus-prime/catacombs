@@ -75,8 +75,9 @@ function App() {
   const fetchCat = useCallback(async (catId: number) => {
     try {
       const result = await client.cat_actions.get_cat(catId);
-      if (result && Number(BigInt(result[0])) > 0) {
-        setCat(parseCat(result));
+      const parsed = parseCat(result);
+      if (result && parsed.max_hp > 0) {
+        setCat(parsed);
       } else {
         setCat(null);
       }
