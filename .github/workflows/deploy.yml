@@ -2,16 +2,17 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   workflow_dispatch:
 
 env:
-  CLIENT_IMAGE: ghcr.io/${{ github.repository }}/client:latest
-  EXPLORER_IMAGE: ghcr.io/${{ github.repository }}/explorer:latest
+  CLIENT_IMAGE: ghcr.io/${{ github.repository }}/client:${{ github.ref_name }}
+  EXPLORER_IMAGE: ghcr.io/${{ github.repository }}/explorer:${{ github.ref_name }}
 
 jobs:
   deploy-client:
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'staging' && 'staging' || 'production' }}
     permissions:
       contents: read
       packages: write
@@ -58,6 +59,7 @@ jobs:
 
   deploy-explorer:
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'staging' && 'staging' || 'production' }}
     permissions:
       contents: read
       packages: write
