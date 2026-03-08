@@ -512,8 +512,8 @@ function App() {
           scene={catScene}
           autoRotate={!connected}
           appearance={viewerAppearance}
-          camera={!connected ? { distance: 1.2, yaw: 15, pitch: 30 } : undefined}
-          cameraTarget={!connected ? { x: 0, y: 0.4, z: 0 } : undefined}
+          camera={!connected ? { distance: 1.4, yaw: 15, pitch: 15 } : undefined}
+          cameraTarget={!connected ? { x: 0, y: 0.35, z: 0 } : undefined}
         />
       </div>
 
@@ -1026,7 +1026,7 @@ function CatViewer({ animation, scene, autoRotate = false, appearance, camera, c
   }, [appearance]);
 
   const src = useMemo(
-    () => `${CAT_VIEWER_BASE}/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=${autoRotate}&camDist=1.2&camY=15&camX=30`,
+    () => `${CAT_VIEWER_BASE}/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=${autoRotate}&camDist=1.4&camY=15&camX=15`,
     // Only set src once on mount — subsequent changes use postMessage
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
