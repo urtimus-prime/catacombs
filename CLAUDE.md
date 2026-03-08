@@ -34,11 +34,21 @@
 - Deployer account (Sepolia): `0x07b74a0227981b8ea8d12bb16276be9f23b3d4d58a5957be6b60688c686e19e3` (keys in `.env`)
 
 ## Cloudflare
-- Token in `.env` as `CLOUDFLARE_TOKEN` — scoped API Token (DNS Zone Edit only)
+- Token in `.env` as `CLOUDFLARE_TOKEN` — account-scoped API Token (DNS Zone Edit + R2 Admin)
+- Verify: `GET /accounts/{acct}/tokens/verify` (NOT `/user/tokens/verify` — it's account-scoped)
 - Auth header: `Authorization: Bearer $CLOUDFLARE_TOKEN`
+- Extract token: `sed -n 's/^CLOUDFLARE_TOKEN="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' .env` (handles quotes)
 - Account ID: `9f79de7451518c7dcca5c99e02eff767`
 - Zone: `noods.cc` — Zone ID: `d41fdeec4e58d62a742e23805ab6f31a`
 - Railway custom domains need unproxied CNAMEs (DNS only, not orange-clouded)
+
+## Cloudflare R2
+- Bucket: `catacombs-assets`
+- Public URL: `https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/`
+- Custom domain: `https://assets.catacombs.noods.cc/` (active, SSL provisioned)
+- Cat viewer assets at: `cat-viewer/` prefix (embed.html, index.js, index.wasm, index.pck)
+- Upload: `curl -X PUT .../r2/buckets/catacombs-assets/objects/{key} -H "Authorization: Bearer $TOKEN" --data-binary @file`
+- ~56MB total (37MB WASM + 20MB PCK + JS/HTML)
 
 ## GitHub
 - PAT in `.env` as `GITHUB_PAT_URTIMUS_PRIME`

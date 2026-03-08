@@ -7,6 +7,9 @@ import { RPC_URL } from "./dojo/config";
 import "./App.css";
 
 const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL ?? "";
+const CAT_VIEWER_BASE = import.meta.env.DEV
+  ? "/cat-viewer"
+  : "https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer";
 
 const NODE_ICONS: Record<string, string> = {
   Start: "\u2302", Combat: "\u2694", Treasure: "\u2666",
@@ -309,7 +312,7 @@ function App() {
     return (
       <div className="connect-screen">
         <iframe
-          src="https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer/embed.html?scene=cosmic_void&autoRotate=true&animation=Cat_Idle"
+          src={`${CAT_VIEWER_BASE}/embed.html?scene=cosmic_void&autoRotate=true&animation=Cat_Idle`}
           className="cat-viewer-iframe"
           allow="autoplay"
         />
@@ -603,7 +606,7 @@ function CatViewer({ animation, scene, className }: {
   }, [animation, scene]);
 
   const src = useMemo(
-    () => `https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=false&camDist=1.5&camY=15&camX=-5`,
+    () => `${CAT_VIEWER_BASE}/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=false&camDist=1.5&camY=15&camX=-5`,
     // Only set src once on mount — subsequent changes use postMessage
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
