@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
 import { useDojoSDK } from "@dojoengine/sdk/react";
 import { RpcProvider } from "starknet";
 import { NODE_TYPES, RUN_STATUS } from "./dojo/models";
 import { RPC_URL } from "./dojo/config";
+import "./App.css";
 
 const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL ?? "";
+
+const NODE_ICONS: Record<string, string> = {
+  Start: "\u2302", Combat: "\u2694", Treasure: "\u2666",
+  Rest: "\u2665", Event: "\u2605", Shop: "\u2617", Boss: "\u2620",
+};
 
 interface TxLog {
   id: number;
@@ -63,6 +69,10 @@ function hasConnection(connections: number, targetNodeId: number): boolean {
 
 const rpcProvider = new RpcProvider({ nodeUrl: RPC_URL });
 
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function App() {
   const { client } = useDojoSDK();
   const { connect, connectors } = useConnect();
@@ -78,7 +88,6 @@ function App() {
     }
   }, [address]);
 
-  // Timeout fallback in case auto-connect silently fails
   useEffect(() => {
     if (!autoConnecting) return;
     const timer = setTimeout(() => setAutoConnecting(false), 3000);
@@ -92,7 +101,13 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [txLogs, setTxLogs] = useState<TxLog[]>([]);
-  const [nextTxId, setNextTxId] = useState(1);
+  const txIdRef = useRef(1);
+
+  // Use refs for latest state to avoid stale closures in callbacks
+  const catRef = useRef(cat);
+  const runRef = useRef(run);
+  useEffect(() => { catRef.current = cat; }, [cat]);
+  useEffect(() => { runRef.current = run; }, [run]);
 
   const fetchCat = useCallback(async (catId: number) => {
     try {
@@ -112,7 +127,6 @@ function App() {
       if (result && Number(BigInt(result[0])) > 0) {
         const r = parseRun(result);
         setRun(r);
-        // Fetch all nodes for this run
         const nodePromises = [];
         for (let i = 0; i <= 6; i++) {
           nodePromises.push(client.run_actions.get_node(runId, i));
@@ -127,16 +141,30 @@ function App() {
   }, [client]);
 
   const addTxLog = useCallback((action: string, txHash: string) => {
-    setTxLogs(prev => [{ id: nextTxId, action, txHash, timestamp: Date.now() }, ...prev]);
-    setNextTxId(prev => prev + 1);
-  }, [nextTxId]);
-
-  const waitForTx = useCallback(async (txHash: string) => {
-    await rpcProvider.waitForTransaction(txHash, { retryInterval: 500 });
+    const id = txIdRef.current++;
+    setTxLogs(prev => [{ id, action, txHash, timestamp: Date.now() }, ...prev]);
   }, []);
 
+  // Poll an RPC read until a condition is met (retries up to maxAttempts)
+  const pollUntil = useCallback(async <T,>(
+    read: () => Promise<T>,
+    condition: (result: T) => boolean,
+    maxAttempts = 10,
+    intervalMs = 1000,
+  ): Promise<T | null> => {
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const result = await read();
+        if (condition(result)) return result;
+      } catch { /* keep polling */ }
+      await delay(intervalMs);
+    }
+    return null;
+  }, []);
+
+  // Core transaction wrapper: executes fn, waits for tx, then runs onConfirmed callback
   const wrap = useCallback(
-    async (fn: () => Promise<any>, actionName: string) => {
+    async (fn: () => Promise<any>, actionName: string, onConfirmed?: () => Promise<void>) => {
       if (!account) return;
       setError(null);
       setSuccess(null);
@@ -145,65 +173,113 @@ function App() {
         const result = await fn();
         if (result?.transaction_hash) {
           addTxLog(actionName, result.transaction_hash);
-          await waitForTx(result.transaction_hash);
+          await rpcProvider.waitForTransaction(result.transaction_hash, { retryInterval: 500 });
+        }
+        if (onConfirmed) {
+          await onConfirmed();
         }
         setSuccess(actionName);
-        return result;
       } catch (e: any) {
         setError(e.message ?? String(e));
       } finally {
         setPending(false);
       }
     },
-    [account, addTxLog, waitForTx]
+    [account, addTxLog]
   );
 
   const createCat = () =>
-    wrap(async () => {
-      const result = await client.cat_actions.create_cat(account!, "12345");
-      return result;
-    }, "Create Cat").then(() => fetchCat(cat?.id ?? 1));
+    wrap(
+      () => client.cat_actions.create_cat(account!, "12345"),
+      "Create Cat",
+      async () => {
+        const catId = catRef.current?.id ?? 1;
+        await pollUntil(
+          () => client.cat_actions.get_cat(catId),
+          (r) => { try { return parseCat(r).max_hp > 0; } catch { return false; } },
+        );
+        await fetchCat(catId);
+      },
+    );
 
   const startRun = () =>
-    wrap(async () => {
-      const result = await client.run_actions.start_run(account!, cat?.id ?? 1);
-      return result;
-    }, "Start Run").then(async () => {
-      const startId = (run?.id ?? 0) + 1;
-      for (let id = startId; id < startId + 10; id++) {
-        try {
-          const r2 = await client.run_actions.get_run(id);
-          const r = parseRun(r2);
-          if (r.cat_id > 0 && r.status === 0) {
-            await fetchRun(id);
-            return;
-          }
-        } catch { continue; }
-      }
-    });
+    wrap(
+      () => client.run_actions.start_run(account!, catRef.current?.id ?? 1),
+      "Start Run",
+      async () => {
+        // Poll for the new active run by scanning IDs
+        const startId = (runRef.current?.id ?? 0) + 1;
+        const found = await pollUntil(
+          async () => {
+            for (let id = startId; id < startId + 10; id++) {
+              try {
+                const r2 = await client.run_actions.get_run(id);
+                const r = parseRun(r2);
+                if (r.cat_id > 0 && r.status === 0) return id;
+              } catch { continue; }
+            }
+            return -1;
+          },
+          (id) => id > 0,
+        );
+        if (found && found > 0) {
+          await fetchRun(found);
+        }
+      },
+    );
 
   const choosePath = (nodeId: number) =>
-    wrap(async () => {
-      if (!run) return;
-      const result = await client.run_actions.choose_path(account!, run.id, nodeId);
-      return result;
-    }, `Choose Path → Node ${nodeId}`).then(() => { if (run) fetchRun(run.id); });
+    wrap(
+      () => {
+        const r = runRef.current;
+        if (!r) return Promise.resolve();
+        return client.run_actions.choose_path(account!, r.id, nodeId);
+      },
+      `Choose Path \u2192 Node ${nodeId}`,
+      async () => {
+        const r = runRef.current;
+        if (!r) return;
+        // Poll until current_node_id changes to the new node
+        await pollUntil(
+          () => client.run_actions.get_run(r.id),
+          (result) => {
+            try { return parseRun(result).current_node_id === nodeId; }
+            catch { return false; }
+          },
+        );
+        await fetchRun(r.id);
+      },
+    );
 
   const abandonRun = () =>
-    wrap(async () => {
-      if (!run) return;
-      const result = await client.run_actions.abandon_run(account!, run.id);
-      return result;
-    }, "Abandon Run").then(() => {
-      if (run) fetchRun(run.id);
-      fetchCat(cat?.id ?? 1);
-    });
+    wrap(
+      () => {
+        const r = runRef.current;
+        if (!r) return Promise.resolve();
+        return client.run_actions.abandon_run(account!, r.id);
+      },
+      "Abandon Run",
+      async () => {
+        const r = runRef.current;
+        if (r) {
+          // Poll until run status changes from Active (0)
+          await pollUntil(
+            () => client.run_actions.get_run(r.id),
+            (result) => {
+              try { return parseRun(result).status !== 0; }
+              catch { return false; }
+            },
+          );
+          await fetchRun(r.id);
+        }
+        await fetchCat(catRef.current?.id ?? 1);
+      },
+    );
 
-  // Auto-fetch cat and find latest active run on connect
+  // Auto-fetch on connect
   useEffect(() => {
     if (!address || !client) return;
     fetchCat(1);
-    // Scan for the latest active run (a valid run has cat_id > 0)
     (async () => {
       for (let id = 10; id >= 1; id--) {
         try {
@@ -215,7 +291,6 @@ function App() {
           }
         } catch { continue; }
       }
-      // No active run; show latest completed/failed
       for (let id = 10; id >= 1; id--) {
         try {
           const result = await client.run_actions.get_run(id);
@@ -229,20 +304,27 @@ function App() {
     })();
   }, [address, client, fetchCat, fetchRun]);
 
+  // ===== CONNECT SCREEN =====
   if (!address) {
     return (
-      <div style={styles.container}>
-        <div style={{ ...styles.card, maxWidth: 500, margin: "100px auto", textAlign: "center" }}>
-          <h1 style={styles.title}>Catacombs</h1>
-          <p style={styles.subtitle}>An on-chain roguelike for cats</p>
+      <div className="connect-screen">
+        <iframe
+          src="https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer/embed.html?scene=cosmic_void&autoRotate=true&animation=Cat_Idle"
+          className="cat-viewer-iframe"
+          allow="autoplay"
+        />
+        <div className="connect-card">
+          <h1 className="connect-title">Catacombs</h1>
+          <p className="connect-subtitle">An on-chain roguelike for cats</p>
+          <div className="connect-divider" />
           {autoConnecting ? (
-            <p style={{ color: "#718096" }}>Connecting...</p>
+            <p className="connect-status">Connecting...</p>
           ) : (
             <button
-              style={styles.button}
+              className="connect-btn"
               onClick={() => connect({ connector: connectors[0] })}
             >
-              Connect Wallet
+              Enter the Catacombs
             </button>
           )}
         </div>
@@ -251,95 +333,113 @@ function App() {
   }
 
   const currentNode = nodes.find(n => n.node_id === run?.current_node_id);
+  const currentNodeType = currentNode ? NODE_TYPES[currentNode.node_type] : undefined;
+  const catAnimation = getCatAnimation(run, currentNodeType, pending);
+  const catScene = getCatScene(currentNodeType);
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.headerTitle}>Catacombs</h1>
-        <div style={styles.headerRight}>
-          <span style={styles.address}>
+    <div className="app">
+      {/* Header */}
+      <header className="header">
+        <h1 className="header-title">Catacombs</h1>
+        <div className="header-right">
+          <span className="header-address">
             {address.slice(0, 6)}...{address.slice(-4)}
           </span>
-          <button style={styles.buttonSmall} onClick={() => disconnect()}>
-            Logout
+          <button className="btn-disconnect" onClick={() => disconnect()}>
+            Disconnect
           </button>
         </div>
       </header>
 
-      {error && <div style={styles.error}>{error}</div>}
-      {success && <div style={styles.success}>{success}</div>}
+      {/* Alerts */}
+      {error && <div className="alert alert-error">{error}</div>}
+      {success && <div className="alert alert-success">{success}</div>}
 
-      <div style={styles.grid}>
+      {/* Cat Viewer + Panels */}
+      <div className="game-layout">
+        <CatViewer animation={catAnimation} scene={catScene} />
+        <div className="panels-column">
         {/* Cat Panel */}
-        <div style={styles.card}>
-          <h2 style={{ margin: "0 0 12px" }}>Cat</h2>
+        <div className="card">
+          <h3 className="card-title">Cat</h3>
           {cat ? (
-            <div>
-              <div style={styles.statGrid}>
-                <Stat label="ID" value={`#${cat.id}`} />
-                <Stat label="Level" value={cat.level} />
-                <Stat label="HP" value={`${cat.hp}/${cat.max_hp}`}
-                  color={cat.hp < cat.max_hp / 3 ? "#e53e3e" : cat.hp < cat.max_hp * 0.7 ? "#d69e2e" : "#38a169"} />
-                <Stat label="XP" value={cat.xp} />
-                <Stat label="ATK" value={cat.attack} />
-                <Stat label="DEF" value={cat.defense} />
-                <Stat label="SPD" value={cat.speed} />
-                <Stat label="LCK" value={cat.luck} />
+            <>
+              <div className="stats-grid">
+                <StatCell label="ID" value={`#${cat.id}`} />
+                <StatCell label="Level" value={cat.level} accent />
+                <StatCell label="XP" value={cat.xp} />
+                <StatCell label="HP" value={`${cat.hp}/${cat.max_hp}`}
+                  hpLevel={cat.hp / cat.max_hp} />
+                <StatCell label="ATK" value={cat.attack} />
+                <StatCell label="DEF" value={cat.defense} />
+                <StatCell label="SPD" value={cat.speed} />
+                <StatCell label="LCK" value={cat.luck} />
               </div>
-              <div style={{ marginTop: 8, fontSize: 12, color: "#718096" }}>
-                Runs: {cat.runs_completed} completed, {cat.runs_failed} failed
-                {!cat.alive && <span style={{ color: "#e53e3e" }}> (wounded)</span>}
+              <div className="hp-bar-container">
+                <div className="hp-bar-track">
+                  <div
+                    className={`hp-bar-fill ${
+                      cat.hp / cat.max_hp > 0.66 ? 'high' :
+                      cat.hp / cat.max_hp > 0.33 ? 'mid' : 'low'
+                    }`}
+                    style={{ width: `${(cat.hp / cat.max_hp) * 100}%` }}
+                  />
+                </div>
               </div>
-            </div>
+              <div className="runs-meta">
+                {cat.runs_completed} completed / {cat.runs_failed} failed
+                {!cat.alive && <span className="wounded"> &mdash; wounded</span>}
+              </div>
+            </>
           ) : (
-            <div>
-              <p style={{ color: "#718096", margin: "8px 0 12px" }}>No cat yet</p>
-              <button style={styles.button} onClick={createCat} disabled={pending}>
-                Create Cat
+            <div className="empty-state">
+              <p>No cat in your roster yet.</p>
+              <button className="btn btn-primary" onClick={createCat} disabled={pending}>
+                Summon Cat
               </button>
             </div>
           )}
         </div>
 
         {/* Run Panel */}
-        <div style={styles.card}>
-          <h2 style={{ margin: "0 0 12px" }}>Run</h2>
+        <div className="card">
+          <h3 className="card-title">Run</h3>
           {run && run.status === 0 ? (
-            <div>
-              <div style={styles.statGrid}>
-                <Stat label="Run" value={`#${run.id}`} />
-                <Stat label="Floor" value={`${run.floor}/${run.max_floors}`} />
-                <Stat label="Position" value={
+            <>
+              <div className="stats-grid">
+                <StatCell label="Run" value={`#${run.id}`} />
+                <StatCell label="Floor" value={`${run.floor}/${run.max_floors}`} />
+                <StatCell label="Position" value={
                   run.current_node_id === 0 ? "Start" :
                   run.current_node_id === 6 ? "Boss" :
                   `Node ${run.current_node_id}`
                 } />
-                <Stat label="Visited" value={run.nodes_visited} />
-                <Stat label="Score" value={run.score} />
-                <Stat label="Status" value={RUN_STATUS[run.status]} color="#38a169" />
+                <StatCell label="Visited" value={run.nodes_visited} />
+                <StatCell label="Score" value={run.score} accent />
+                <StatCell label="Status" value={RUN_STATUS[run.status]}
+                  hpLevel={1} />
               </div>
-              <div style={{ ...styles.buttonRow, marginTop: 12 }}>
-                <button
-                  style={{ ...styles.button, ...styles.dangerButton }}
-                  onClick={abandonRun}
-                  disabled={pending}
-                >
+              <div style={{ marginTop: 16 }}>
+                <button className="btn btn-danger" onClick={abandonRun} disabled={pending}>
                   Abandon Run
                 </button>
               </div>
-            </div>
+            </>
           ) : (
-            <div>
-              <p style={{ color: "#718096", margin: "8px 0" }}>
+            <div className="empty-state">
+              <p>
                 {run ? `Last run: ${RUN_STATUS[run.status]}` : "No active run"}
               </p>
               {cat && (
-                <button style={styles.button} onClick={startRun} disabled={pending || !cat.alive}>
-                  Start Run
+                <button className="btn btn-primary" onClick={startRun}
+                  disabled={pending || !cat.alive}>
+                  Begin Descent
                 </button>
               )}
             </div>
           )}
+        </div>
         </div>
       </div>
 
@@ -356,44 +456,43 @@ function App() {
 
       {/* Activity Log */}
       {txLogs.length > 0 && (
-        <div style={styles.card}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <h2 style={{ margin: 0 }}>Activity Log</h2>
-            <button style={styles.buttonSmall} onClick={() => setTxLogs([])}>Clear</button>
+        <div className="card">
+          <div className="log-header">
+            <h3 className="card-title" style={{ margin: 0 }}>Activity Log</h3>
+            <button className="btn-clear" onClick={() => setTxLogs([])}>Clear</button>
           </div>
-          <div style={styles.logTable}>
-            <div style={styles.logHeader}>
-              <span style={{ width: 40 }}>#</span>
-              <span style={{ flex: 1 }}>Action</span>
-              <span style={{ width: 340 }}>Transaction Hash</span>
-              <span style={{ width: 70, textAlign: "right" }}>Time</span>
+          <div className="log-table">
+            <div className="log-row log-row-header">
+              <span>#</span>
+              <span>Action</span>
+              <span>Transaction</span>
+              <span style={{ textAlign: "right" }}>Time</span>
             </div>
             {txLogs.map((log) => (
-              <div key={log.id} style={styles.logRow}>
-                <span style={{ width: 40, color: "#718096" }}>{log.id}</span>
-                <span style={{ flex: 1, color: "#e2e8f0", fontWeight: "bold" }}>{log.action}</span>
-                <span style={{ width: 340 }}>
+              <div key={log.id} className="log-row">
+                <span className="log-num">{log.id}</span>
+                <span className="log-action">{log.action}</span>
+                <span>
                   {EXPLORER_URL ? (
                     <a
                       href={`${EXPLORER_URL}/tx/${log.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={styles.txHash}
-                      title={`View in Explorer: ${log.txHash}`}
+                      className="log-hash"
                     >
-                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} ↗
+                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x2197;
                     </a>
                   ) : (
                     <span
-                      style={{ ...styles.txHash, cursor: "pointer" }}
-                      title="Click to copy full hash"
+                      className="log-hash"
+                      style={{ cursor: "pointer" }}
                       onClick={() => navigator.clipboard.writeText(log.txHash)}
                     >
-                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} ⧉
+                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x29C9;
                     </span>
                   )}
                 </span>
-                <span style={{ width: 70, textAlign: "right", color: "#718096", fontSize: 11 }}>
+                <span className="log-time">
                   {new Date(log.timestamp).toLocaleTimeString()}
                 </span>
               </div>
@@ -402,26 +501,126 @@ function App() {
         </div>
       )}
 
-      {pending && <div style={styles.pending}>Processing...</div>}
+      {/* Pending indicator */}
+      {pending && (
+        <div className="pending-indicator">
+          <div className="pending-dot" />
+          Processing transaction...
+        </div>
+      )}
     </div>
   );
 }
 
-function Stat({ label, value, color }: { label: string; value: string | number; color?: string }) {
+// ===== COMPONENTS =====
+
+function StatCell({ label, value, hpLevel, accent }: {
+  label: string;
+  value: string | number;
+  hpLevel?: number;
+  accent?: boolean;
+}) {
+  let colorClass = "";
+  if (hpLevel !== undefined) {
+    colorClass = hpLevel > 0.66 ? "hp-high" : hpLevel > 0.33 ? "hp-mid" : "hp-low";
+  } else if (accent) {
+    colorClass = "accent";
+  }
   return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 11, color: "#718096", textTransform: "uppercase" }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: "bold", color: color ?? "#e2e8f0" }}>{value}</div>
+    <div className="stat">
+      <div className="stat-label">{label}</div>
+      <div className={`stat-value ${colorClass}`}>{value}</div>
     </div>
+  );
+}
+
+// Animation mapping: node type -> cat animation
+const NODE_ANIM: Record<string, string> = {
+  Start: "Cat_Idle",
+  Combat: "Sword_Attack_Light",
+  Treasure: "Cat_HipHop",
+  Rest: "Cat_Idle",
+  Event: "Looking_Around",
+  Shop: "Cat_Idle",
+  Boss: "Sword_Attack_Medium",
+};
+
+const PENDING_ANIM = "Cat_Walking";
+const IDLE_ANIM = "Cat_Idle";
+const NO_RUN_ANIM = "Cat_SillyDance";
+
+function getCatAnimation(
+  run: RunState | null,
+  currentNodeType: string | undefined,
+  pending: boolean,
+): string {
+  if (pending) return PENDING_ANIM;
+  if (!run || run.status !== 0) return NO_RUN_ANIM;
+  if (currentNodeType) return NODE_ANIM[currentNodeType] ?? IDLE_ANIM;
+  return IDLE_ANIM;
+}
+
+function getCatScene(currentNodeType: string | undefined): string {
+  switch (currentNodeType) {
+    case "Combat": case "Boss": return "neon_city";
+    case "Treasure": return "cozy_fireplace";
+    case "Rest": return "moonlit_garden";
+    case "Event": return "sakura_garden";
+    case "Shop": return "winter_wonderland";
+    default: return "default_studio";
+  }
+}
+
+function CatViewer({ animation, scene, className }: {
+  animation: string;
+  scene: string;
+  className?: string;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const prevAnimation = useRef(animation);
+  const prevScene = useRef(scene);
+
+  // Send configure messages when props change
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+
+    const config: Record<string, any> = {};
+    if (animation !== prevAnimation.current) {
+      config.animation = animation;
+      prevAnimation.current = animation;
+    }
+    if (scene !== prevScene.current) {
+      config.scene = scene;
+      prevScene.current = scene;
+    }
+    if (Object.keys(config).length > 0) {
+      iframe.contentWindow.postMessage(
+        { type: "catViewer:configure", config },
+        "*"
+      );
+    }
+  }, [animation, scene]);
+
+  const src = useMemo(
+    () => `https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=false&camDist=1.5&camY=15&camX=-5`,
+    // Only set src once on mount — subsequent changes use postMessage
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  return (
+    <iframe
+      ref={iframeRef}
+      src={src}
+      className={className ?? "cat-viewer-panel"}
+      allow="autoplay"
+    />
   );
 }
 
 function MapView({
-  run,
-  nodes,
-  currentConnections,
-  onChoosePath,
-  pending,
+  run, nodes, currentConnections, onChoosePath, pending,
 }: {
   run: RunState;
   nodes: NodeState[];
@@ -429,269 +628,49 @@ function MapView({
   onChoosePath: (nodeId: number) => void;
   pending: boolean;
 }) {
-  const columns = [
-    [0],
-    [1, 2],
-    [3, 4],
-    [5],
-    [6],
-  ];
+  const columns = [[0], [1, 2], [3, 4], [5], [6]];
 
   return (
-    <div style={styles.card}>
-      <h2 style={{ margin: "0 0 12px" }}>Map (Floor {run.floor})</h2>
-      <div style={styles.mapContainer}>
+    <div className="card">
+      <div className="map-header">
+        <h3 className="card-title" style={{ margin: 0 }}>Dungeon Map</h3>
+        <span className="map-floor">Floor {run.floor}/{run.max_floors}</span>
+      </div>
+      <div className="map-container">
         {columns.map((col, colIdx) => (
-          <div key={colIdx} style={styles.mapColumn}>
+          <div key={colIdx} className="map-column">
             {col.map((nodeId) => {
               const node = nodes.find(n => n.node_id === nodeId);
               const isCurrent = run.current_node_id === nodeId;
               const isReachable = hasConnection(currentConnections, nodeId);
               const typeName = node ? NODE_TYPES[node.node_type] : "?";
 
+              const classes = [
+                "node-btn",
+                `type-${typeName}`,
+                isCurrent ? "current" : "",
+                isReachable && !isCurrent ? "reachable" : "",
+                !isCurrent && !isReachable ? "dimmed" : "",
+              ].filter(Boolean).join(" ");
+
               return (
-                <NodeButton
+                <button
                   key={nodeId}
-                  nodeId={nodeId}
-                  typeName={typeName}
-                  isCurrent={isCurrent}
-                  isReachable={isReachable}
+                  className={classes}
                   onClick={() => onChoosePath(nodeId)}
                   disabled={pending || !isReachable}
-                />
+                >
+                  <span className="node-icon">{NODE_ICONS[typeName] ?? "?"}</span>
+                  <span className="node-type">{typeName}</span>
+                </button>
               );
             })}
           </div>
         ))}
       </div>
-      <p style={styles.hint}>
-        Click a highlighted node to move there. You can only move to connected nodes.
-      </p>
+      <p className="map-hint">Move to a connected node by clicking it.</p>
     </div>
   );
 }
-
-const TYPE_COLORS: Record<string, string> = {
-  Start: "#4a5568",
-  Combat: "#e53e3e",
-  Treasure: "#d69e2e",
-  Rest: "#38a169",
-  Event: "#805ad5",
-  Shop: "#3182ce",
-  Boss: "#c53030",
-};
-
-function NodeButton({
-  nodeId,
-  typeName,
-  isCurrent,
-  isReachable,
-  onClick,
-  disabled,
-}: {
-  nodeId: number;
-  typeName: string;
-  isCurrent: boolean;
-  isReachable: boolean;
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  const bg = TYPE_COLORS[typeName] ?? "#2d3748";
-
-  return (
-    <button
-      style={{
-        ...styles.nodeButton,
-        backgroundColor: bg,
-        opacity: isReachable || isCurrent ? 1 : 0.35,
-        border: isCurrent ? "2px solid #f6e05e" : isReachable ? "2px solid #63b3ed" : "2px solid #4a5568",
-        boxShadow: isCurrent ? "0 0 8px #f6e05e" : isReachable ? "0 0 6px rgba(99,179,237,0.4)" : "none",
-        cursor: isReachable && !disabled ? "pointer" : "default",
-      }}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      <div style={{ fontSize: 11, lineHeight: 1.2 }}>
-        {typeName}
-        <div style={{ fontSize: 9, color: "#cbd5e0" }}>#{nodeId}</div>
-      </div>
-    </button>
-  );
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh",
-    backgroundColor: "#1a1a2e",
-    color: "#e2e8f0",
-    fontFamily: "'Courier New', monospace",
-    padding: "20px",
-    maxWidth: "900px",
-    margin: "0 auto",
-  },
-  card: {
-    backgroundColor: "#16213e",
-    borderRadius: "8px",
-    padding: "20px",
-    marginBottom: "16px",
-    border: "1px solid #2d3748",
-  },
-  title: {
-    fontSize: "48px",
-    color: "#e2e8f0",
-    margin: "0 0 8px",
-  },
-  subtitle: {
-    color: "#718096",
-    marginBottom: "24px",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "20px",
-    padding: "12px 0",
-    borderBottom: "1px solid #2d3748",
-  },
-  headerTitle: {
-    margin: 0,
-    fontSize: "24px",
-  },
-  headerRight: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-  },
-  address: {
-    fontSize: "14px",
-    color: "#718096",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "16px",
-  },
-  statGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
-    gap: "8px",
-  },
-  buttonRow: {
-    display: "flex",
-    gap: "8px",
-  },
-  button: {
-    backgroundColor: "#3182ce",
-    color: "white",
-    border: "none",
-    borderRadius: "6px",
-    padding: "10px 20px",
-    cursor: "pointer",
-    fontFamily: "'Courier New', monospace",
-    fontSize: "14px",
-    fontWeight: "bold",
-  },
-  buttonSmall: {
-    backgroundColor: "#4a5568",
-    color: "white",
-    border: "none",
-    borderRadius: "4px",
-    padding: "6px 12px",
-    cursor: "pointer",
-    fontFamily: "'Courier New', monospace",
-    fontSize: "12px",
-  },
-  dangerButton: {
-    backgroundColor: "#e53e3e",
-  },
-  error: {
-    backgroundColor: "#742a2a",
-    color: "#feb2b2",
-    padding: "10px 16px",
-    borderRadius: "6px",
-    marginBottom: "16px",
-    fontSize: "14px",
-  },
-  success: {
-    backgroundColor: "#22543d",
-    color: "#9ae6b4",
-    padding: "10px 16px",
-    borderRadius: "6px",
-    marginBottom: "16px",
-    fontSize: "14px",
-  },
-  pending: {
-    position: "fixed" as const,
-    bottom: "20px",
-    right: "20px",
-    backgroundColor: "#2d3748",
-    padding: "10px 20px",
-    borderRadius: "6px",
-    border: "1px solid #4a5568",
-  },
-  mapContainer: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "20px 0",
-    gap: "8px",
-  },
-  mapColumn: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "12px",
-    alignItems: "center",
-  },
-  nodeButton: {
-    width: "80px",
-    height: "55px",
-    borderRadius: "8px",
-    color: "#e2e8f0",
-    fontFamily: "'Courier New', monospace",
-    fontWeight: "bold",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hint: {
-    color: "#718096",
-    fontSize: "12px",
-    textAlign: "center" as const,
-  },
-  logTable: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "2px",
-    fontSize: "13px",
-    fontFamily: "'Courier New', monospace",
-  },
-  logHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "6px 8px",
-    color: "#718096",
-    fontSize: "11px",
-    textTransform: "uppercase" as const,
-    borderBottom: "1px solid #2d3748",
-  },
-  logRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "8px",
-    borderRadius: "4px",
-    backgroundColor: "#1a1a2e",
-  },
-  txHash: {
-    color: "#63b3ed",
-    textDecoration: "none",
-    fontSize: "12px",
-    padding: "2px 6px",
-    borderRadius: "3px",
-    backgroundColor: "#1a202c",
-    border: "1px solid #2d3748",
-  },
-};
 
 export default App;

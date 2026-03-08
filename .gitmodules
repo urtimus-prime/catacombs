@@ -16,3 +16,9 @@
 [submodule "reference/explorer"]
 	path = reference/explorer
 	url = https://github.com/cartridge-gg/explorer.git
+[submodule "reference/cat-viewer"]
+	path = reference/cat-viewer
+	url = https://github.com/urtimus-prime/cat-viewer.git
+[submodule "reference/game-a-day"]
+	path = reference/game-a-day
+	url = https://github.com/polats/game-a-day.git

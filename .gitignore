@@ -3,3 +3,5 @@ node_modules/
 target/
 dist/
 .snfoundry_cache/
+godot
+client/public/cat-viewer/
