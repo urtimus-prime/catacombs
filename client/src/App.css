@@ -692,3 +692,220 @@ body::after {
 .node-icon-Event::before { content: ''; }
 .node-icon-Shop::before { content: ''; }
 .node-icon-Boss::before { content: ''; }
+
+/* ===== MOBILE RESPONSIVE ===== */
+
+@media (max-width: 640px) {
+
+  /* Layout */
+  .app {
+    padding: 16px 12px 100px;
+  }
+
+  /* Connect screen */
+  .connect-title {
+    font-size: 36px;
+    letter-spacing: 0.05em;
+  }
+
+  .connect-subtitle {
+    font-size: 11px;
+    margin-bottom: 32px;
+  }
+
+  .connect-btn {
+    padding: 14px 32px;
+    font-size: 13px;
+    width: 100%;
+    max-width: 300px;
+  }
+
+  /* Header */
+  .header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .header-title {
+    font-size: 16px;
+  }
+
+  .header-right {
+    gap: 8px;
+  }
+
+  .header-address {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  .btn-disconnect {
+    font-size: 10px;
+    padding: 4px 10px;
+  }
+
+  /* Game layout: stack vertically on mobile */
+  .game-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .cat-viewer-panel {
+    aspect-ratio: 16 / 10;
+    max-height: 240px;
+  }
+
+  .panels-column {
+    gap: 12px;
+  }
+
+  /* Cards */
+  .card {
+    padding: 14px 12px;
+    margin-bottom: 12px;
+  }
+
+  .card-title {
+    font-size: 11px;
+    margin-bottom: 12px;
+  }
+
+  /* Stats */
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+  }
+
+  .stat {
+    padding: 6px 2px;
+  }
+
+  .stat-label {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+  }
+
+  .stat-value {
+    font-size: 13px;
+  }
+
+  /* Map */
+  .map-container {
+    padding: 12px 0;
+    gap: 3px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .node-btn {
+    width: 56px;
+    height: 48px;
+    border-width: 1.5px;
+  }
+
+  .node-btn .node-icon {
+    font-size: 14px;
+  }
+
+  .node-btn .node-type {
+    font-size: 8px;
+    letter-spacing: 0;
+  }
+
+  .map-hint {
+    font-size: 10px;
+  }
+
+  /* Activity log */
+  .log-row {
+    grid-template-columns: 28px 1fr 72px;
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .log-row .log-time {
+    display: none;
+  }
+
+  .log-row.log-row-header {
+    grid-template-columns: 28px 1fr 72px;
+    font-size: 8px;
+    padding: 4px 8px 6px;
+  }
+
+  .log-row.log-row-header span:last-child {
+    display: none;
+  }
+
+  .log-hash {
+    font-size: 9px;
+    padding: 2px 4px;
+  }
+
+  /* Buttons */
+  .btn {
+    font-size: 11px;
+    padding: 10px 20px;
+    width: 100%;
+  }
+
+  /* Alerts */
+  .alert {
+    font-size: 12px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    word-break: break-word;
+  }
+
+  /* Pending indicator */
+  .pending-indicator {
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    justify-content: center;
+    font-size: 11px;
+    padding: 10px 16px;
+  }
+
+  /* HP bar */
+  .hp-bar-container {
+    margin-top: 8px;
+  }
+
+  .runs-meta {
+    font-size: 10px;
+    margin-top: 8px;
+  }
+
+  .empty-state p {
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+}
+
+/* Small phones (iPhone SE etc) */
+@media (max-width: 375px) {
+  .connect-title {
+    font-size: 28px;
+  }
+
+  .node-btn {
+    width: 48px;
+    height: 42px;
+  }
+
+  .node-btn .node-type {
+    font-size: 7px;
+  }
+
+  .node-btn .node-icon {
+    font-size: 12px;
+  }
+
+  .stat-value {
+    font-size: 12px;
+  }
+}
