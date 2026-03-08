@@ -74,8 +74,6 @@ function createController(): Connector {
 }
 
 // --- Provider setup ---
-const isRemote = CHAIN === "sepolia" || CHAIN === "slot";
-
 const slotChain: Chain = {
   id: BigInt(SLOT_CHAIN_ID),
   name: "Slot Katana",
@@ -97,7 +95,8 @@ const slotChain: Chain = {
 } as Chain;
 
 const chain = CHAIN === "sepolia" ? sepolia : CHAIN === "slot" ? slotChain : katana;
-const connectors = [isRemote ? createController() : createKatanaBurner()];
+// Controller only works on Sepolia (account contracts pre-declared); Slot/Katana use burner
+const connectors = [CHAIN === "sepolia" ? createController() : createKatanaBurner()];
 const provider = jsonRpcProvider({ rpc: () => ({ nodeUrl: RPC_URL }) });
 
 export default function StarknetProvider({ children }: PropsWithChildren) {
