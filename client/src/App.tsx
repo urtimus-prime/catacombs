@@ -8,7 +8,7 @@ import "./App.css";
 
 const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL ?? "";
 // Bump CAT_VIEWER_VERSION when rebuilding Godot, then upload to R2 under the new path
-const CAT_VIEWER_VERSION = "v1";
+const CAT_VIEWER_VERSION = "v2";
 const CAT_VIEWER_BASE = import.meta.env.DEV
   ? "/cat-viewer"
   : `https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer/${CAT_VIEWER_VERSION}`;
