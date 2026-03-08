@@ -314,6 +314,7 @@ body::after {
   aspect-ratio: unset;
   max-height: none;
   border: none;
+  pointer-events: none; /* Disable camera controls on title screen */
 }
 
 /* Player tab: hide viewer without unloading */
@@ -1095,6 +1096,11 @@ body::after {
   }
 
   /* Connect screen */
+  .connect-screen {
+    align-items: flex-end;
+    padding: 20px 20px 10vh;
+  }
+
   .connect-title {
     font-size: 36px;
     letter-spacing: 0.05em;

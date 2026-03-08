@@ -507,7 +507,14 @@ function App() {
     <div className={connected ? "app" : "connect-screen"}>
       {/* Always-mounted cat viewer — never unmounts across screens or tabs */}
       <div className={viewerSlotClass}>
-        <CatViewer animation={catAnimation} scene={catScene} autoRotate={!connected} appearance={viewerAppearance} />
+        <CatViewer
+          animation={catAnimation}
+          scene={catScene}
+          autoRotate={!connected}
+          appearance={viewerAppearance}
+          camera={!connected ? { distance: 1.3, yaw: 15, pitch: 20 } : undefined}
+          cameraTarget={!connected ? { x: 0, y: 0.5, z: 0 } : undefined}
+        />
       </div>
 
       {/* ===== CONNECT SCREEN ===== */}
@@ -953,11 +960,13 @@ function getCatScene(currentNodeType: string | undefined): string {
   }
 }
 
-function CatViewer({ animation, scene, autoRotate = false, appearance }: {
+function CatViewer({ animation, scene, autoRotate = false, appearance, camera, cameraTarget }: {
   animation: string;
   scene: string;
   autoRotate?: boolean;
   appearance?: Record<string, any> | null;
+  camera?: { distance: number; yaw: number; pitch: number };
+  cameraTarget?: { x: number; y: number; z: number };
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const prevProps = useRef({ animation: "", scene: "", autoRotate: false, appearance: "" });
@@ -973,12 +982,14 @@ function CatViewer({ animation, scene, autoRotate = false, appearance }: {
         if (!iframe?.contentWindow) return;
         const config: Record<string, any> = { animation, scene, autoRotate };
         if (appearance) Object.assign(config, appearance);
+        if (camera) config.camera = camera;
+        if (cameraTarget) config.cameraTarget = cameraTarget;
         iframe.contentWindow.postMessage({ type: "catViewer:configure", config }, "*");
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [animation, scene, autoRotate, appearance]);
+  }, [animation, scene, autoRotate, appearance, camera, cameraTarget]);
 
   // Send configure messages when props change
   useEffect(() => {
@@ -992,13 +1003,16 @@ function CatViewer({ animation, scene, autoRotate = false, appearance }: {
 
     prevProps.current = { ...prevProps.current, animation, scene, autoRotate };
 
+    if (camera) config.camera = camera;
+    if (cameraTarget) config.cameraTarget = cameraTarget;
+
     if (Object.keys(config).length > 0) {
       iframe.contentWindow.postMessage(
         { type: "catViewer:configure", config },
         "*"
       );
     }
-  }, [animation, scene, autoRotate]);
+  }, [animation, scene, autoRotate, camera, cameraTarget]);
 
   // Send appearance separately — always resend when appearance changes
   useEffect(() => {
@@ -1012,7 +1026,7 @@ function CatViewer({ animation, scene, autoRotate = false, appearance }: {
   }, [appearance]);
 
   const src = useMemo(
-    () => `${CAT_VIEWER_BASE}/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=${autoRotate}&camDist=1.5&camY=15&camX=-5`,
+    () => `${CAT_VIEWER_BASE}/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=${autoRotate}&camDist=1.3&camY=15&camX=20`,
     // Only set src once on mount — subsequent changes use postMessage
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
