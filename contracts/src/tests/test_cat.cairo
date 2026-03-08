@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use dojo::model::ModelStorage;
+    use dojo::model::{ModelStorage, ModelStorageTest};
     use dojo::world::WorldStorageTrait;
     use dojo_snf_test::{
         spawn_test_world, NamespaceDef, TestResource, ContractDefTrait, ContractDef,
@@ -11,6 +11,7 @@ mod tests {
 
     use catacombs::systems::cat_actions::{ICatActionsDispatcher, ICatActionsDispatcherTrait};
     use catacombs::models::cat::{Cat, CatAppearance, CatCounter, PlayerCats, pack_appearance, unpack_appearance, AppearanceData};
+    use catacombs::models::shiny::{ShinyBalance, SUMMON_COST};
 
     const PLAYER: felt252 = 'PLAYER';
     const PLAYER2: felt252 = 'PLAYER2';
@@ -34,9 +35,11 @@ mod tests {
                 TestResource::Model("CatAppearance"),
                 TestResource::Model("CatCounter"),
                 TestResource::Model("PlayerCats"),
+                TestResource::Model("ShinyBalance"),
                 TestResource::Event("CatCreated"),
                 TestResource::Event("CatVerified"),
                 TestResource::Event("CatLeveledUp"),
+                TestResource::Event("ShiniesSpent"),
                 TestResource::Contract("cat_actions"),
             ]
                 .span(),
@@ -59,6 +62,11 @@ mod tests {
         PLAYER2.try_into().unwrap()
     }
 
+    // Give a player enough SHINIES to create cats in tests
+    fn credit_shinies(ref world: dojo::world::WorldStorage, owner: ContractAddress, amount: u64) {
+        world.write_model_test(@ShinyBalance { owner, balance: amount });
+    }
+
     fn setup() -> (dojo::world::WorldStorage, ICatActionsDispatcher) {
         let ndef = namespace_def();
         let mut world = spawn_test_world([ndef].span());
@@ -66,6 +74,8 @@ mod tests {
         let (contract_address, _) = world.dns(@"cat_actions").unwrap();
         let actions = ICatActionsDispatcher { contract_address };
         start_cheat_caller_address(contract_address, caller());
+        // Pre-credit SHINIES for tests
+        credit_shinies(ref world, caller(), 100);
         (world, actions)
     }
 
@@ -83,10 +93,10 @@ mod tests {
         assert!(cat.max_hp == 100, "max_hp should be 100");
         assert!(cat.level == 1, "level should be 1");
         assert!(cat.xp == 0, "xp should be 0");
-        assert!(cat.attack == 5, "attack should be 5");
-        assert!(cat.defense == 5, "defense should be 5");
-        assert!(cat.speed == 5, "speed should be 5");
-        assert!(cat.luck == 5, "luck should be 5");
+        assert!(cat.attack >= 3 && cat.attack <= 8, "attack should be 3-8");
+        assert!(cat.defense >= 3 && cat.defense <= 8, "defense should be 3-8");
+        assert!(cat.speed >= 3 && cat.speed <= 8, "speed should be 3-8");
+        assert!(cat.luck >= 3 && cat.luck <= 8, "luck should be 3-8");
         assert!(cat.alive, "cat should be alive");
         assert!(!cat.verified, "cat should not be verified yet");
     }
@@ -139,12 +149,13 @@ mod tests {
 
     #[test]
     fn test_different_players_own_separate_cats() {
-        let (world, actions) = setup();
+        let (mut world, actions) = setup();
 
         // Player 1 creates a cat
         let cat1 = actions.create_cat(REPO_HASH, default_appearance());
 
-        // Switch to player 2
+        // Switch to player 2 (credit shinies first)
+        credit_shinies(ref world, caller2(), 100);
         let (contract_address, _) = world.dns(@"cat_actions").unwrap();
         start_cheat_caller_address(contract_address, caller2());
         let cat2 = actions.create_cat('player2_repo', default_appearance());
@@ -212,5 +223,26 @@ mod tests {
 
         let stored = actions.get_cat_appearance(cat_id);
         assert!(stored.packed == appearance, "get_cat_appearance should return stored appearance");
+    }
+
+    #[test]
+    fn test_create_cat_deducts_shinies() {
+        let (world, actions) = setup();
+        let before: ShinyBalance = world.read_model(caller());
+        assert!(before.balance == 100, "should start with 100 shinies");
+
+        actions.create_cat(REPO_HASH, default_appearance());
+
+        let after: ShinyBalance = world.read_model(caller());
+        assert!(after.balance == 100 - SUMMON_COST, "should deduct 10 shinies");
+    }
+
+    #[test]
+    #[should_panic(expected: "not enough SHINIES")]
+    fn test_create_cat_without_shinies_panics() {
+        let (mut world, actions) = setup();
+        // Zero out balance
+        credit_shinies(ref world, caller(), 0);
+        actions.create_cat(REPO_HASH, default_appearance());
     }
 }

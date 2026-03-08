@@ -75,6 +75,7 @@ function createController(): Connector {
   const catAddr = getContractAddress("catacombs-cat_actions");
   const runAddr = getContractAddress("catacombs-run_actions");
   const encAddr = getContractAddress("catacombs-encounter_actions");
+  const shinyAddr = getContractAddress("catacombs-shiny_actions");
 
   return new ControllerConnector({
     chains: [{ rpcUrl: RPC_URL }],
@@ -98,6 +99,11 @@ function createController(): Connector {
           methods: [
             { name: "Submit Scenario", entrypoint: "submit_scenario", description: "Submit a scenario for an encounter" },
             { name: "Resolve Encounter", entrypoint: "resolve_encounter", description: "Resolve an encounter outcome" },
+          ],
+        },
+        [shinyAddr]: {
+          methods: [
+            { name: "Buy Shinies", entrypoint: "buy_shinies", description: "Buy SHINIES with STRK" },
           ],
         },
       },

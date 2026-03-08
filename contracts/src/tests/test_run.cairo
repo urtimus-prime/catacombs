@@ -18,6 +18,7 @@ mod tests {
     use catacombs::models::run::{Run, RunStatus};
     use catacombs::models::node::{Node, NodeType};
     use catacombs::models::encounter::{Encounter, EncounterResult};
+    use catacombs::models::shiny::ShinyBalance;
 
     const PLAYER: felt252 = 'PLAYER';
     const OTHER: felt252 = 'OTHER';
@@ -38,8 +39,10 @@ mod tests {
                 TestResource::Model("Encounter"),
                 TestResource::Model("Item"),
                 TestResource::Model("CatInventory"),
+                TestResource::Model("ShinyBalance"),
                 // Events
                 TestResource::Event("CatCreated"),
+                TestResource::Event("ShiniesSpent"),
                 TestResource::Event("CatVerified"),
                 TestResource::Event("CatLeveledUp"),
                 TestResource::Event("RunStarted"),
@@ -95,6 +98,9 @@ mod tests {
         start_cheat_caller_address(cat_addr, caller());
         start_cheat_caller_address(run_addr, caller());
         start_cheat_caller_address(enc_addr, caller());
+
+        // Pre-credit SHINIES for cat creation
+        world.write_model_test(@ShinyBalance { owner: caller(), balance: 100 });
 
         TestContext {
             world,
@@ -402,6 +408,12 @@ mod tests {
     fn test_level_up_on_xp_threshold() {
         let (mut ctx, cat_id, run_id) = setup_with_run();
 
+        // Record initial random stats before level-up
+        let cat_before: Cat = ctx.world.read_model(cat_id);
+        let atk_before = cat_before.attack;
+        let def_before = cat_before.defense;
+        let max_hp_before = cat_before.max_hp;
+
         // Set cat to 90 xp (needs 100 for level 2 at level 1)
         let mut cat: Cat = ctx.world.read_model(cat_id);
         cat.xp = 90;
@@ -416,9 +428,9 @@ mod tests {
         let cat: Cat = ctx.world.read_model(cat_id);
         assert!(cat.level == 2, "cat should level up to 2");
         assert!(cat.xp == 105, "xp should be 105 (90+15)");
-        assert!(cat.max_hp == 105, "max_hp should increase by 5");
-        assert!(cat.attack == 6, "attack should increase by 1");
-        assert!(cat.defense == 6, "defense should increase by 1");
+        assert!(cat.max_hp == max_hp_before + 5, "max_hp should increase by 5");
+        assert!(cat.attack == atk_before + 1, "attack should increase by 1");
+        assert!(cat.defense == def_before + 1, "defense should increase by 1");
     }
 
     #[test]

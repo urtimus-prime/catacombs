@@ -21,6 +21,8 @@ pub mod cat_actions {
     use dojo::model::ModelStorage;
     use dojo::event::EventStorage;
     use catacombs::models::cat::{Cat, CatAppearance, CatCounter, PlayerCats, CatCreated, CatVerified};
+    use catacombs::models::shiny::{ShinyBalance, ShiniesSpent, SUMMON_COST};
+    use catacombs::helpers::random::{RandomTrait};
 
     #[abi(embed_v0)]
     impl CatActionsImpl of ICatActions<ContractState> {
@@ -28,13 +30,29 @@ pub mod cat_actions {
             let mut world = self.world_default();
             let caller = get_caller_address();
 
+            // Deduct SHINIES
+            let mut bal: ShinyBalance = world.read_model(caller);
+            assert!(bal.balance >= SUMMON_COST, "not enough SHINIES (need 10)");
+            bal.balance -= SUMMON_COST;
+            world.write_model(@bal);
+            world.emit_event(
+                @ShiniesSpent { spender: caller, amount: SUMMON_COST, reason: 'summon_cat' },
+            );
+
             // Get and increment cat counter
             let mut counter: CatCounter = world.read_model(0_u8);
             counter.count += 1;
             let cat_id = counter.count;
             world.write_model(@counter);
 
-            // Create the cat with base stats
+            // Roll random stats seeded from tx hash + cat_id
+            let mut rng = RandomTrait::new(cat_id.into());
+            let attack: u8 = rng.between(3, 8);
+            let defense: u8 = rng.between(3, 8);
+            let speed: u8 = rng.between(3, 8);
+            let luck: u8 = rng.between(3, 8);
+
+            // Create the cat with random stats
             let cat = Cat {
                 id: cat_id,
                 owner: caller,
@@ -43,10 +61,10 @@ pub mod cat_actions {
                 max_hp: 100,
                 level: 1,
                 xp: 0,
-                attack: 5,
-                defense: 5,
-                speed: 5,
-                luck: 5,
+                attack,
+                defense,
+                speed,
+                luck,
                 alive: true,
                 runs_completed: 0,
                 runs_failed: 0,

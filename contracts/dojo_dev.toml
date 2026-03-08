@@ -12,4 +12,4 @@ private_key = "0xc5b2fcab997346f3ea1c00b002ecf6f382c5f9c9659a3894eb783c5320f912"
 
 # Grant all three systems write access to the catacombs namespace.
 [writers]
-"catacombs" = ["catacombs-cat_actions", "catacombs-run_actions", "catacombs-encounter_actions"]
+"catacombs" = ["catacombs-cat_actions", "catacombs-run_actions", "catacombs-encounter_actions", "catacombs-shiny_actions"]

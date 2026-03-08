@@ -34,7 +34,7 @@
   "contracts": [
     {
       "address": "0x7134f3e1da676d12ed437adaef858234a6b82f68663829a044ecaa64a67db47",
-      "class_hash": "0x73ca13246c788eef47400fbc558304a4920775db8ce1478fad509962c1bc4f0",
+      "class_hash": "0x5c2be564478d382e6d3fefdf254d50b99e22a5356bbb291fa05e829a4928721",
       "init_calldata": [],
       "tag": "catacombs-cat_actions",
       "selector": "0xb6c2525fe5cdc16ab185cd1243365dafaaabeaea4c94c5959ad5ecf021c04f",
@@ -66,6 +66,17 @@
         "start_run",
         "choose_path",
         "abandon_run",
+        "upgrade"
+      ]
+    },
+    {
+      "address": "0x7fe2d396cae5305d36ac124f81eb22eaf2a464b3aad9d02557b1eb0d59289b4",
+      "class_hash": "0x7a31e538a7c8f8cc665307ec243430298f7c8744cd6aae88da50bb226d76bdb",
+      "init_calldata": [],
+      "tag": "catacombs-shiny_actions",
+      "selector": "0x415ff0f329f643f98943d85f847accf3450d56102ea3b759b3d75c31a86f5ea",
+      "systems": [
+        "buy_shinies",
         "upgrade"
       ]
     }
@@ -153,6 +164,23 @@
       "class_hash": "0x5f173128d9a9f5d6d7f1e1abed9e044c00a28f3d9b2abaf22e0e61895cfc02a",
       "tag": "catacombs-Cat",
       "selector": "0x44d6516eff67524bc84e644bebdab11b776c0955d9459af4f982886a62a4c69"
+    },
+    {
+      "members": [
+        {
+          "name": "cat_id",
+          "type": "core::integer::u64",
+          "key": true
+        },
+        {
+          "name": "packed",
+          "type": "core::felt252",
+          "key": false
+        }
+      ],
+      "class_hash": "0x68878f5627787845d81443745083d2ef7fa23aba2cb1eb48dbdb2f49104ab58",
+      "tag": "catacombs-CatAppearance",
+      "selector": "0x176789da0b4bfe79b7d48c86b813b2e7c87390748aedfc9d206d1de5bf56934"
     },
     {
       "members": [
@@ -399,6 +427,23 @@
       "class_hash": "0x134de090d2d627910b1e976e260ecce33eceab99d09478481a1cde0eaff2811",
       "tag": "catacombs-RunCounter",
       "selector": "0x131bdb9bb5b20c5fb59563c8562b186c14d428b8ed7d8577d1a50d8498f2ad5"
+    },
+    {
+      "members": [
+        {
+          "name": "owner",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": true
+        },
+        {
+          "name": "balance",
+          "type": "core::integer::u64",
+          "key": false
+        }
+      ],
+      "class_hash": "0x3d2eaa4e31531c04f3c80c996bc1d7ae4f98d518364fe1f4493872d25083a65",
+      "tag": "catacombs-ShinyBalance",
+      "selector": "0x73d06e3e09cf05dfff0f2975427d1146045a861ccac6a37b6e9dd0a9640d210"
     }
   ],
   "events": [
@@ -663,6 +708,50 @@
       "class_hash": "0x5046fdf07fbaf2ab70192040ae3c1f9f6a76edb07cd21945f621f8cd8cfdb72",
       "tag": "catacombs-ScenarioGenerated",
       "selector": "0x2a62465627ccff929e241a642228cbe1be7a996958099c262e6177ad3a1a7f3"
+    },
+    {
+      "members": [
+        {
+          "name": "buyer",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": true
+        },
+        {
+          "name": "amount",
+          "type": "core::integer::u64",
+          "key": false
+        },
+        {
+          "name": "strk_paid",
+          "type": "core::integer::u256",
+          "key": false
+        }
+      ],
+      "class_hash": "0x36c0be4192c41ae17882aaf018a013d6019bf6da9c22b1a841a74a4f1568377",
+      "tag": "catacombs-ShiniesBought",
+      "selector": "0x24dbb918dd3ac8291a9e08a146cd3e5b1a89ba912fb3563eb29c84d3024e4de"
+    },
+    {
+      "members": [
+        {
+          "name": "spender",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": true
+        },
+        {
+          "name": "amount",
+          "type": "core::integer::u64",
+          "key": false
+        },
+        {
+          "name": "reason",
+          "type": "core::felt252",
+          "key": false
+        }
+      ],
+      "class_hash": "0x56a8bde8709c2581cfbfa5de86e996cefb457cc7606a3f2de29d30097852678",
+      "tag": "catacombs-ShiniesSpent",
+      "selector": "0x641f8fc2dcd1c1301bde0019cbdbf83b15a18795a8b9f14d603f19fec3cd1a"
     }
   ],
   "external_contracts": [],
@@ -730,6 +819,30 @@
         {
           "name": "verified",
           "type": "core::bool"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::cat::CatAppearance",
+      "members": [
+        {
+          "name": "cat_id",
+          "type": "core::integer::u64"
+        },
+        {
+          "name": "packed",
+          "type": "core::felt252"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::cat::CatAppearanceValue",
+      "members": [
+        {
+          "name": "packed",
+          "type": "core::felt252"
         }
       ]
     },
@@ -944,6 +1057,12 @@
     {
       "type": "event",
       "name": "catacombs::models::cat::m_Cat::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "event",
+      "name": "catacombs::models::cat::m_CatAppearance::Event",
       "kind": "enum",
       "variants": []
     },
@@ -1760,6 +1879,112 @@
       "variants": []
     },
     {
+      "type": "struct",
+      "name": "catacombs::models::shiny::ShiniesBought",
+      "members": [
+        {
+          "name": "buyer",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "amount",
+          "type": "core::integer::u64"
+        },
+        {
+          "name": "strk_paid",
+          "type": "core::integer::u256"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::shiny::ShiniesBoughtValue",
+      "members": [
+        {
+          "name": "amount",
+          "type": "core::integer::u64"
+        },
+        {
+          "name": "strk_paid",
+          "type": "core::integer::u256"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::shiny::ShiniesSpent",
+      "members": [
+        {
+          "name": "spender",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "amount",
+          "type": "core::integer::u64"
+        },
+        {
+          "name": "reason",
+          "type": "core::felt252"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::shiny::ShiniesSpentValue",
+      "members": [
+        {
+          "name": "amount",
+          "type": "core::integer::u64"
+        },
+        {
+          "name": "reason",
+          "type": "core::felt252"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::shiny::ShinyBalance",
+      "members": [
+        {
+          "name": "owner",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "balance",
+          "type": "core::integer::u64"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::shiny::ShinyBalanceValue",
+      "members": [
+        {
+          "name": "balance",
+          "type": "core::integer::u64"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "catacombs::models::shiny::e_ShiniesBought::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "event",
+      "name": "catacombs::models::shiny::e_ShiniesSpent::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "event",
+      "name": "catacombs::models::shiny::m_ShinyBalance::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
       "type": "interface",
       "name": "catacombs::systems::cat_actions::ICatActions",
       "items": [
@@ -1769,6 +1994,10 @@
           "inputs": [
             {
               "name": "repo_hash",
+              "type": "core::felt252"
+            },
+            {
+              "name": "appearance",
               "type": "core::felt252"
             }
           ],
@@ -1803,6 +2032,22 @@
           "outputs": [
             {
               "type": "catacombs::models::cat::Cat"
+            }
+          ],
+          "state_mutability": "view"
+        },
+        {
+          "type": "function",
+          "name": "get_cat_appearance",
+          "inputs": [
+            {
+              "name": "cat_id",
+              "type": "core::integer::u64"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "catacombs::models::cat::CatAppearance"
             }
           ],
           "state_mutability": "view"
@@ -2029,6 +2274,57 @@
       ]
     },
     {
+      "type": "interface",
+      "name": "catacombs::systems::shiny_actions::IShinyActions",
+      "items": [
+        {
+          "type": "function",
+          "name": "buy_shinies",
+          "inputs": [
+            {
+              "name": "amount",
+              "type": "core::integer::u64"
+            }
+          ],
+          "outputs": [],
+          "state_mutability": "external"
+        },
+        {
+          "type": "function",
+          "name": "get_balance",
+          "inputs": [
+            {
+              "name": "owner",
+              "type": "core::starknet::contract_address::ContractAddress"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "core::integer::u64"
+            }
+          ],
+          "state_mutability": "view"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "catacombs::systems::shiny_actions::shiny_actions::Event",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "UpgradeableEvent",
+          "type": "dojo::contract::components::upgradeable::upgradeable_cpt::Event",
+          "kind": "nested"
+        },
+        {
+          "name": "WorldProviderEvent",
+          "type": "dojo::contract::components::world_provider::world_provider_cpt::Event",
+          "kind": "nested"
+        }
+      ]
+    },
+    {
       "type": "constructor",
       "name": "constructor",
       "inputs": []
@@ -2152,6 +2448,20 @@
         {
           "name": "pending_word_len",
           "type": "core::internal::bounded_int::BoundedInt::<0, 30>"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "core::integer::u256",
+      "members": [
+        {
+          "name": "low",
+          "type": "core::integer::u128"
+        },
+        {
+          "name": "high",
+          "type": "core::integer::u128"
         }
       ]
     },
@@ -3849,7 +4159,7 @@
       "inputs": [
         {
           "name": "event",
-          "type": "catacombs::models::encounter::ScenarioGenerated"
+          "type": "catacombs::models::shiny::ShiniesSpent"
         }
       ],
       "outputs": [],
@@ -3868,7 +4178,7 @@
       "inputs": [
         {
           "name": "value",
-          "type": "catacombs::models::encounter::ScenarioGeneratedValue"
+          "type": "catacombs::models::shiny::ShiniesSpentValue"
         }
       ],
       "outputs": [],

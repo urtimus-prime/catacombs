@@ -4,12 +4,22 @@ pub mod models {
     pub mod node;
     pub mod encounter;
     pub mod item;
+    pub mod shiny;
+}
+
+pub mod interfaces {
+    pub mod erc20;
+}
+
+pub mod helpers {
+    pub mod random;
 }
 
 pub mod systems {
     pub mod cat_actions;
     pub mod run_actions;
     pub mod encounter_actions;
+    pub mod shiny_actions;
 }
 
 #[cfg(test)]

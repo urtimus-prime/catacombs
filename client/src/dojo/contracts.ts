@@ -3,6 +3,9 @@ import type { Account, AccountInterface } from "starknet";
 import { RpcProvider, CallData } from "starknet";
 import { RPC_URL } from "./config";
 
+// STRK token address (same on Katana, Sepolia, Mainnet)
+export const STRK_ADDRESS = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+
 const NS = "catacombs";
 const OPTS = { tip: 0 };
 
@@ -24,6 +27,7 @@ export function setupWorld(provider: DojoProvider) {
   const catAddr = manifest.contracts.find((c: any) => c.tag === "catacombs-cat_actions")!.address;
   const runAddr = manifest.contracts.find((c: any) => c.tag === "catacombs-run_actions")!.address;
   const encAddr = manifest.contracts.find((c: any) => c.tag === "catacombs-encounter_actions")!.address;
+  const shinyAddr = manifest.contracts.find((c: any) => c.tag === "catacombs-shiny_actions")!.address;
 
   const cat_actions = {
     create_cat: async (account: Account | AccountInterface, repoHash: string, appearance: string) => {
@@ -106,5 +110,33 @@ export function setupWorld(provider: DojoProvider) {
     },
   };
 
-  return { cat_actions, run_actions, encounter_actions };
+  const shiny_actions = {
+    buy_shinies: async (account: Account | AccountInterface, amount: number) => {
+      // Multicall: approve STRK spend + buy shinies in one tx
+      const cost = BigInt(amount) * BigInt("1000000000000000000"); // amount * 1e18
+      const costLow = "0x" + (cost & ((1n << 128n) - 1n)).toString(16);
+      const costHigh = "0x" + (cost >> 128n).toString(16);
+
+      return await account.execute([
+        {
+          contractAddress: STRK_ADDRESS,
+          entrypoint: "approve",
+          calldata: [shinyAddr, costLow, costHigh],
+        },
+        {
+          contractAddress: shinyAddr,
+          entrypoint: "buy_shinies",
+          calldata: [String(amount)],
+        },
+      ]);
+    },
+    get_balance: async (owner: string) => {
+      return await rawCall(shinyAddr, "get_balance", [owner]);
+    },
+    get_strk_balance: async (owner: string) => {
+      return await rawCall(STRK_ADDRESS, "balance_of", [owner]);
+    },
+  };
+
+  return { cat_actions, run_actions, encounter_actions, shiny_actions };
 }

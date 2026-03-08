@@ -787,6 +787,40 @@ body::after {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ===== SHINIES BAR ===== */
+
+.shinies-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--stone-800);
+  border: 1px solid var(--stone-700);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.shinies-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--stone-400);
+}
+
+.shinies-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--amber-400);
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 11px;
+  margin-left: auto;
+}
+
 /* ===== CAT ROSTER ===== */
 
 .cat-roster {

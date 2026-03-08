@@ -193,6 +193,8 @@ function App() {
   const [pending, setPending] = useState(false);
   const [creating, setCreating] = useState(false);
   const [appearance, setAppearance] = useState<AppearanceData>(defaultAppearance);
+  const [shinies, setShinies] = useState<number>(0);
+  const [strkBalance, setStrkBalance] = useState<string>("0");
   const [cats, setCats] = useState<{ cat: CatState; appearance: AppearanceData | null }[]>([]);
   const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
   const [connectDance] = useState(() => pickRandom(DANCE_ANIMS));
@@ -257,6 +259,22 @@ function App() {
       setSelectedCatId(found[0].cat.id);
     }
   }, [client, selectedCatId]);
+
+  const fetchShinies = useCallback(async () => {
+    if (!address) return;
+    try {
+      const result = await client.shiny_actions.get_balance(address);
+      setShinies(Number(BigInt(result[0])));
+    } catch { /* no balance yet */ }
+    try {
+      const result = await client.shiny_actions.get_strk_balance(address);
+      // STRK has 18 decimals, show as human-readable
+      const raw = BigInt(result[0]) + (BigInt(result[1]) << 128n);
+      const whole = raw / 1_000_000_000_000_000_000n;
+      const frac = (raw % 1_000_000_000_000_000_000n) / 1_000_000_000_000_000n; // 3 decimal places
+      setStrkBalance(`${whole}.${frac.toString().padStart(3, "0")}`);
+    } catch { /* no strk balance */ }
+  }, [address, client]);
 
   const fetchRun = useCallback(async (runId: number) => {
     try {
@@ -349,6 +367,16 @@ function App() {
           setSelectedCatId(found);
         }
         setCreating(false);
+        fetchShinies();
+      },
+    );
+
+  const buyShinies = (amount: number) =>
+    wrap(
+      () => client.shiny_actions.buy_shinies(account!, amount),
+      `Buy ${amount} SHINIES`,
+      async () => {
+        fetchShinies();
       },
     );
 
@@ -430,6 +458,7 @@ function App() {
   useEffect(() => {
     if (!address || !client) return;
     fetchAllCats();
+    fetchShinies();
     (async () => {
       for (let id = 10; id >= 1; id--) {
         try {
@@ -452,13 +481,13 @@ function App() {
         } catch { continue; }
       }
     })();
-  }, [address, client, fetchAllCats, fetchRun]);
+  }, [address, client, fetchAllCats, fetchRun, fetchShinies]);
 
   const connected = !!address;
   const currentNode = nodes.find(n => n.node_id === run?.current_node_id);
   const currentNodeType = currentNode ? NODE_TYPES[currentNode.node_type] : undefined;
   const catAnimation = connected
-    ? (tab === "cats" && !run?.status ? catIdleAnim : getCatAnimation(run, currentNodeType, pending))
+    ? (tab === "cats" ? catIdleAnim : getCatAnimation(run, currentNodeType, pending))
     : connectDance;
   const catScene = connected ? getCatScene(currentNodeType) : "default_studio";
   const viewerSlotClass = connected ? `cat-viewer-slot slot-${tab}` : "cat-viewer-slot slot-connect";
@@ -507,11 +536,22 @@ function App() {
       {/* ===== CATS TAB ===== */}
       {connected && tab === "cats" && (
         <div className="tab-content">
+          {/* SHINIES Balance */}
+          <div className="shinies-bar">
+            <span className="shinies-label">SHINIES</span>
+            <span className="shinies-value">{shinies}</span>
+            {shinies < 10 && (
+              <button className="btn btn-primary btn-sm" onClick={() => buyShinies(10)} disabled={pending}>
+                Buy 10 (10 STRK)
+              </button>
+            )}
+          </div>
+
           {creating ? (
             <CatCreator
               appearance={appearance}
               onChange={setAppearance}
-              onConfirm={() => createCat(appearance)}
+              onConfirm={() => shinies >= 10 ? createCat(appearance) : setError("Need 10 SHINIES to summon a cat. Buy some in the Player tab!")}
               onCancel={() => setCreating(false)}
               pending={pending}
             />
@@ -726,6 +766,14 @@ function App() {
                 {address}
               </span>
             </div>
+            <div className="player-field">
+              <span className="player-label">SHINIES</span>
+              <span className="player-value">{shinies}</span>
+            </div>
+            <div className="player-field">
+              <span className="player-label">STRK</span>
+              <span className="player-value">{strkBalance}</span>
+            </div>
             {cat && (
               <div className="player-field">
                 <span className="player-label">Cat</span>
@@ -738,6 +786,13 @@ function App() {
                 <span className="player-value">#{run.id} &middot; {RUN_STATUS[run.status]}</span>
               </div>
             )}
+            <div className="buy-shinies-row" style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[10, 50, 100].map(amt => (
+                <button key={amt} className="btn btn-primary" onClick={() => buyShinies(amt)} disabled={pending}>
+                  Buy {amt} SHINIES ({amt} STRK)
+                </button>
+              ))}
+            </div>
             <div style={{ marginTop: 20 }}>
               <button className="btn btn-danger" onClick={() => disconnect()}>
                 Disconnect Wallet
