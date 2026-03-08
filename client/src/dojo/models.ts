@@ -56,10 +56,17 @@ export interface Encounter {
   loot_id: number;
 }
 
+export interface CatAppearance {
+  fieldOrder: string[];
+  cat_id: number;
+  packed: string;
+}
+
 export interface SchemaType {
   [namespace: string]: { [model: string]: { [field: string]: any } };
   catacombs: {
     Cat: Cat;
+    CatAppearance: CatAppearance;
     Run: Run;
     Node: Node;
     Encounter: Encounter;
@@ -77,6 +84,10 @@ export const schema: SchemaType = {
       id: 0, owner: "", repo_hash: "0x0", hp: 0, max_hp: 0,
       level: 0, xp: 0, attack: 0, defense: 0, speed: 0, luck: 0,
       alive: false, runs_completed: 0, runs_failed: 0, verified: false,
+    },
+    CatAppearance: {
+      fieldOrder: ["cat_id", "packed"],
+      cat_id: 0, packed: "0x0",
     },
     Run: {
       fieldOrder: [
@@ -107,6 +118,7 @@ export const schema: SchemaType = {
 
 export enum ModelsMapping {
   Cat = "catacombs-Cat",
+  CatAppearance = "catacombs-CatAppearance",
   CatCounter = "catacombs-CatCounter",
   PlayerCats = "catacombs-PlayerCats",
   Run = "catacombs-Run",

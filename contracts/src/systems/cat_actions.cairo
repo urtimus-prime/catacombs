@@ -1,14 +1,17 @@
 #[starknet::interface]
 pub trait ICatActions<T> {
-    // Create a new cat linked to a gitlab.crux.casa repo.
+    // Create a new cat with appearance. appearance is a bit-packed felt252.
     // repo_hash = poseidon("gitlab.crux.casa:{username}:{repo_name}")
-    fn create_cat(ref self: T, repo_hash: felt252) -> u64;
+    fn create_cat(ref self: T, repo_hash: felt252, appearance: felt252) -> u64;
 
     // Mark a cat as verified (called by oracle after Mirror SSH verification).
     fn verify_cat(ref self: T, cat_id: u64);
 
     // Read cat state.
     fn get_cat(self: @T, cat_id: u64) -> catacombs::models::cat::Cat;
+
+    // Read cat appearance.
+    fn get_cat_appearance(self: @T, cat_id: u64) -> catacombs::models::cat::CatAppearance;
 }
 
 #[dojo::contract]
@@ -17,11 +20,11 @@ pub mod cat_actions {
     use starknet::get_caller_address;
     use dojo::model::ModelStorage;
     use dojo::event::EventStorage;
-    use catacombs::models::cat::{Cat, CatCounter, PlayerCats, CatCreated, CatVerified};
+    use catacombs::models::cat::{Cat, CatAppearance, CatCounter, PlayerCats, CatCreated, CatVerified};
 
     #[abi(embed_v0)]
     impl CatActionsImpl of ICatActions<ContractState> {
-        fn create_cat(ref self: ContractState, repo_hash: felt252) -> u64 {
+        fn create_cat(ref self: ContractState, repo_hash: felt252, appearance: felt252) -> u64 {
             let mut world = self.world_default();
             let caller = get_caller_address();
 
@@ -51,6 +54,9 @@ pub mod cat_actions {
             };
             world.write_model(@cat);
 
+            // Store appearance
+            world.write_model(@CatAppearance { cat_id, packed: appearance });
+
             // Track player's cat count
             let mut player_cats: PlayerCats = world.read_model(caller);
             player_cats.count += 1;
@@ -77,6 +83,11 @@ pub mod cat_actions {
         }
 
         fn get_cat(self: @ContractState, cat_id: u64) -> Cat {
+            let world = self.world_default();
+            world.read_model(cat_id)
+        }
+
+        fn get_cat_appearance(self: @ContractState, cat_id: u64) -> CatAppearance {
             let world = self.world_default();
             world.read_model(cat_id)
         }

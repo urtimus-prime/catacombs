@@ -29,6 +29,7 @@ mod tests {
             resources: [
                 // Models
                 TestResource::Model("Cat"),
+                TestResource::Model("CatAppearance"),
                 TestResource::Model("CatCounter"),
                 TestResource::Model("PlayerCats"),
                 TestResource::Model("Run"),
@@ -105,7 +106,7 @@ mod tests {
 
     fn setup_with_cat() -> (TestContext, u64) {
         let ctx = setup();
-        let cat_id = ctx.cat_actions.create_cat(REPO_HASH);
+        let cat_id = ctx.cat_actions.create_cat(REPO_HASH, 0);
         (ctx, cat_id)
     }
 

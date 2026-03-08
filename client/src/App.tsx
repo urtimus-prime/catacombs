@@ -42,6 +42,94 @@ interface NodeState {
   node_id: number; node_type: number; connections: number; resolved: boolean;
 }
 
+// Appearance data matching the on-chain bit-packed felt252
+interface AppearanceData {
+  primaryR: number; primaryG: number; primaryB: number;
+  stripeR: number; stripeG: number; stripeB: number;
+  eyeR: number; eyeG: number; eyeB: number;
+  headSize: number; eyeSize: number; eyeSpacing: number;
+  bodyWidth: number; tailSize: number; hatId: number;
+}
+
+const HAT_NAMES = ["none", "chef_hat", "cowboy_hat", "crown", "pirate_hat", "viking_helmet", "winter_hat", "wizard_hat"];
+
+function defaultAppearance(): AppearanceData {
+  return {
+    primaryR: 230, primaryG: 140, primaryB: 38,
+    stripeR: 102, stripeG: 38, stripeB: 13,
+    eyeR: 77, eyeG: 179, eyeB: 51,
+    headSize: 8, eyeSize: 8, eyeSpacing: 8,
+    bodyWidth: 8, tailSize: 8, hatId: 0,
+  };
+}
+
+function randomAppearance(): AppearanceData {
+  const r8 = () => Math.floor(Math.random() * 256);
+  const r4 = () => Math.floor(Math.random() * 16);
+  return {
+    primaryR: r8(), primaryG: r8(), primaryB: r8(),
+    stripeR: r8(), stripeG: r8(), stripeB: r8(),
+    eyeR: r8(), eyeG: r8(), eyeB: r8(),
+    headSize: r4(), eyeSize: r4(), eyeSpacing: r4(),
+    bodyWidth: r4(), tailSize: r4(), hatId: 0,
+  };
+}
+
+function packAppearance(d: AppearanceData): bigint {
+  return BigInt(d.primaryR)
+    + BigInt(d.primaryG) * (1n << 8n)
+    + BigInt(d.primaryB) * (1n << 16n)
+    + BigInt(d.stripeR) * (1n << 24n)
+    + BigInt(d.stripeG) * (1n << 32n)
+    + BigInt(d.stripeB) * (1n << 40n)
+    + BigInt(d.eyeR) * (1n << 48n)
+    + BigInt(d.eyeG) * (1n << 56n)
+    + BigInt(d.eyeB) * (1n << 64n)
+    + BigInt(d.headSize) * (1n << 72n)
+    + BigInt(d.eyeSize) * (1n << 76n)
+    + BigInt(d.eyeSpacing) * (1n << 80n)
+    + BigInt(d.bodyWidth) * (1n << 84n)
+    + BigInt(d.tailSize) * (1n << 88n)
+    + BigInt(d.hatId) * (1n << 92n);
+}
+
+function unpackAppearance(packed: bigint): AppearanceData {
+  const u8 = (shift: bigint) => Number((packed >> shift) & 0xFFn);
+  const u4 = (shift: bigint) => Number((packed >> shift) & 0xFn);
+  return {
+    primaryR: u8(0n), primaryG: u8(8n), primaryB: u8(16n),
+    stripeR: u8(24n), stripeG: u8(32n), stripeB: u8(40n),
+    eyeR: u8(48n), eyeG: u8(56n), eyeB: u8(64n),
+    headSize: u4(72n), eyeSize: u4(76n), eyeSpacing: u4(80n),
+    bodyWidth: u4(84n), tailSize: u4(88n), hatId: u4(92n),
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + [r, g, b].map(c => c.toString(16).padStart(2, "0")).join("");
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const v = parseInt(hex.slice(1), 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+
+// Convert 0-15 bone scale to 0-1 float for the viewer
+function boneToFloat(v: number): number { return v / 15; }
+
+function appearanceToViewerConfig(d: AppearanceData) {
+  return {
+    primaryColor: rgbToHex(d.primaryR, d.primaryG, d.primaryB),
+    stripeColor: rgbToHex(d.stripeR, d.stripeG, d.stripeB),
+    eyeColor: rgbToHex(d.eyeR, d.eyeG, d.eyeB),
+    headSize: boneToFloat(d.headSize),
+    eyeSize: boneToFloat(d.eyeSize),
+    bodyWidth: boneToFloat(d.bodyWidth),
+    tailSize: boneToFloat(d.tailSize),
+    hat: HAT_NAMES[d.hatId] ?? "none",
+  };
+}
+
 function parseCat(r: any[]): CatState {
   const n = (i: number) => Number(BigInt(r[i]));
   return {
@@ -103,13 +191,22 @@ function App() {
   }, [autoConnecting]);
 
   const [pending, setPending] = useState(false);
-  const [cat, setCat] = useState<CatState | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [appearance, setAppearance] = useState<AppearanceData>(defaultAppearance);
+  const [cats, setCats] = useState<{ cat: CatState; appearance: AppearanceData | null }[]>([]);
+  const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
+  const [connectDance] = useState(() => pickRandom(DANCE_ANIMS));
+  const [catIdleAnim, setCatIdleAnim] = useState(IDLE_ANIM);
   const [run, setRun] = useState<RunState | null>(null);
   const [nodes, setNodes] = useState<NodeState[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [txLogs, setTxLogs] = useState<TxLog[]>([]);
   const txIdRef = useRef(1);
+
+  const selectedEntry = cats.find(e => e.cat.id === selectedCatId);
+  const cat = selectedEntry?.cat ?? null;
+  const catAppearance = selectedEntry?.appearance ?? null;
 
   // Use refs for latest state to avoid stale closures in callbacks
   const catRef = useRef(cat);
@@ -122,12 +219,44 @@ function App() {
       const result = await client.cat_actions.get_cat(catId);
       const parsed = parseCat(result);
       if (result && parsed.max_hp > 0) {
-        setCat(parsed);
-      } else {
-        setCat(null);
+        let app: AppearanceData | null = null;
+        try {
+          const appResult = await client.cat_actions.get_cat_appearance(catId);
+          const packed = BigInt(appResult[1]);
+          if (packed > 0n) app = unpackAppearance(packed);
+        } catch { /* appearance may not exist for old cats */ }
+        setCats(prev => {
+          const without = prev.filter(e => e.cat.id !== catId);
+          return [...without, { cat: parsed, appearance: app }].sort((a, b) => a.cat.id - b.cat.id);
+        });
+        return parsed;
       }
-    } catch { setCat(null); }
+    } catch { /* cat doesn't exist */ }
+    return null;
   }, [client]);
+
+  const fetchAllCats = useCallback(async () => {
+    const found: { cat: CatState; appearance: AppearanceData | null }[] = [];
+    for (let id = 1; id <= 20; id++) {
+      try {
+        const result = await client.cat_actions.get_cat(id);
+        const parsed = parseCat(result);
+        if (parsed.max_hp > 0) {
+          let app: AppearanceData | null = null;
+          try {
+            const appResult = await client.cat_actions.get_cat_appearance(id);
+            const packed = BigInt(appResult[1]);
+            if (packed > 0n) app = unpackAppearance(packed);
+          } catch {}
+          found.push({ cat: parsed, appearance: app });
+        }
+      } catch { break; }
+    }
+    setCats(found);
+    if (found.length > 0 && !selectedCatId) {
+      setSelectedCatId(found[0].cat.id);
+    }
+  }, [client, selectedCatId]);
 
   const fetchRun = useCallback(async (runId: number) => {
     try {
@@ -196,17 +325,30 @@ function App() {
     [account, addTxLog]
   );
 
-  const createCat = () =>
+  const createCat = (app: AppearanceData) =>
     wrap(
-      () => client.cat_actions.create_cat(account!, "12345"),
+      () => client.cat_actions.create_cat(account!, "12345", "0x" + packAppearance(app).toString(16)),
       "Create Cat",
       async () => {
-        const catId = catRef.current?.id ?? 1;
-        await pollUntil(
-          () => client.cat_actions.get_cat(catId),
-          (r) => { try { return parseCat(r).max_hp > 0; } catch { return false; } },
+        // Find the newly created cat by scanning IDs
+        const startId = cats.length > 0 ? Math.max(...cats.map(e => e.cat.id)) + 1 : 1;
+        const found = await pollUntil(
+          async () => {
+            for (let id = startId; id < startId + 10; id++) {
+              try {
+                const r = await client.cat_actions.get_cat(id);
+                if (parseCat(r).max_hp > 0) return id;
+              } catch { continue; }
+            }
+            return -1;
+          },
+          (id) => id > 0,
         );
-        await fetchCat(catId);
+        if (found && found > 0) {
+          await fetchCat(found);
+          setSelectedCatId(found);
+        }
+        setCreating(false);
       },
     );
 
@@ -287,7 +429,7 @@ function App() {
   // Auto-fetch on connect
   useEffect(() => {
     if (!address || !client) return;
-    fetchCat(1);
+    fetchAllCats();
     (async () => {
       for (let id = 10; id >= 1; id--) {
         try {
@@ -310,27 +452,40 @@ function App() {
         } catch { continue; }
       }
     })();
-  }, [address, client, fetchCat, fetchRun]);
+  }, [address, client, fetchAllCats, fetchRun]);
 
   const connected = !!address;
   const currentNode = nodes.find(n => n.node_id === run?.current_node_id);
   const currentNodeType = currentNode ? NODE_TYPES[currentNode.node_type] : undefined;
-  const catAnimation = connected ? getCatAnimation(run, currentNodeType, pending) : "Cat_Idle";
-  const catScene = connected ? getCatScene(currentNodeType) : "cosmic_void";
+  const catAnimation = connected
+    ? (tab === "cats" && !run?.status ? catIdleAnim : getCatAnimation(run, currentNodeType, pending))
+    : connectDance;
+  const catScene = connected ? getCatScene(currentNodeType) : "default_studio";
   const viewerSlotClass = connected ? `cat-viewer-slot slot-${tab}` : "cat-viewer-slot slot-connect";
+
+  // Show the cat's on-chain appearance in the viewer (creator overrides when active)
+  const activeAppearance = (tab === "cats" && creating)
+    ? appearance
+    : catAppearance ?? defaultAppearance();
+  // Memoize so the reference only changes when actual values change or cat selection changes
+  const viewerAppearance = useMemo(
+    () => appearanceToViewerConfig(activeAppearance),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedCatId, creating, JSON.stringify(activeAppearance)]
+  );
 
   return (
     <div className={connected ? "app" : "connect-screen"}>
       {/* Always-mounted cat viewer — never unmounts across screens or tabs */}
       <div className={viewerSlotClass}>
-        <CatViewer animation={catAnimation} scene={catScene} autoRotate={!connected} />
+        <CatViewer animation={catAnimation} scene={catScene} autoRotate={!connected} appearance={viewerAppearance} />
       </div>
 
       {/* ===== CONNECT SCREEN ===== */}
       {!connected && (
         <div className="connect-card">
           <h1 className="connect-title">Catacombs</h1>
-          <p className="connect-subtitle">An on-chain roguelike for cats</p>
+          <p className="connect-subtitle">A cat-like rogue-like</p>
           <div className="connect-divider" />
           {autoConnecting ? (
             <p className="connect-status">Connecting...</p>
@@ -339,7 +494,7 @@ function App() {
               className="connect-btn"
               onClick={() => connect({ connector: connectors[0] })}
             >
-              Enter the Catacombs
+              Start Playing
             </button>
           )}
         </div>
@@ -352,46 +507,85 @@ function App() {
       {/* ===== CATS TAB ===== */}
       {connected && tab === "cats" && (
         <div className="tab-content">
-          <div className="card">
-            <h3 className="card-title">Cat</h3>
-            {cat ? (
-              <>
-                <div className="stats-grid">
-                  <StatCell label="ID" value={`#${cat.id}`} />
-                  <StatCell label="Level" value={cat.level} accent />
-                  <StatCell label="XP" value={cat.xp} />
-                  <StatCell label="HP" value={`${cat.hp}/${cat.max_hp}`}
-                    hpLevel={cat.hp / cat.max_hp} />
-                  <StatCell label="ATK" value={cat.attack} />
-                  <StatCell label="DEF" value={cat.defense} />
-                  <StatCell label="SPD" value={cat.speed} />
-                  <StatCell label="LCK" value={cat.luck} />
+          {creating ? (
+            <CatCreator
+              appearance={appearance}
+              onChange={setAppearance}
+              onConfirm={() => createCat(appearance)}
+              onCancel={() => setCreating(false)}
+              pending={pending}
+            />
+          ) : (
+            <>
+              {/* Cat Roster */}
+              {cats.length > 0 && (
+                <div className="cat-roster">
+                  {cats.map(entry => (
+                    <button
+                      key={entry.cat.id}
+                      className={`roster-item ${entry.cat.id === selectedCatId ? "selected" : ""}`}
+                      onClick={() => {
+                        setSelectedCatId(entry.cat.id);
+                        setCatIdleAnim(prev => pickRandom(IDLE_ANIMS, prev));
+                      }}
+                    >
+                      <span className="roster-id">#{entry.cat.id}</span>
+                      <span className="roster-level">Lv.{entry.cat.level}</span>
+                      <span className={`roster-status ${entry.cat.alive ? "" : "wounded"}`}>
+                        {entry.cat.alive ? "\u2665" : "\u2620"}
+                      </span>
+                    </button>
+                  ))}
+                  <button className="roster-item roster-add" onClick={() => setCreating(true)}>
+                    <span className="roster-plus">+</span>
+                  </button>
                 </div>
-                <div className="hp-bar-container">
-                  <div className="hp-bar-track">
-                    <div
-                      className={`hp-bar-fill ${
-                        cat.hp / cat.max_hp > 0.66 ? 'high' :
-                        cat.hp / cat.max_hp > 0.33 ? 'mid' : 'low'
-                      }`}
-                      style={{ width: `${(cat.hp / cat.max_hp) * 100}%` }}
-                    />
+              )}
+
+              {/* Selected Cat Details */}
+              {cat ? (
+                <div className="card">
+                  <h3 className="card-title">Cat #{cat.id}</h3>
+                  <div className="stats-grid">
+                    <StatCell label="Level" value={cat.level} accent />
+                    <StatCell label="XP" value={cat.xp} />
+                    <StatCell label="HP" value={`${cat.hp}/${cat.max_hp}`}
+                      hpLevel={cat.hp / cat.max_hp} />
+                    <StatCell label="ATK" value={cat.attack} />
+                    <StatCell label="DEF" value={cat.defense} />
+                    <StatCell label="SPD" value={cat.speed} />
+                    <StatCell label="LCK" value={cat.luck} />
+                    <StatCell label="Status" value={cat.alive ? "Alive" : "Wounded"}
+                      hpLevel={cat.alive ? 1 : 0} />
+                  </div>
+                  <div className="hp-bar-container">
+                    <div className="hp-bar-track">
+                      <div
+                        className={`hp-bar-fill ${
+                          cat.hp / cat.max_hp > 0.66 ? 'high' :
+                          cat.hp / cat.max_hp > 0.33 ? 'mid' : 'low'
+                        }`}
+                        style={{ width: `${(cat.hp / cat.max_hp) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="runs-meta">
+                    {cat.runs_completed} completed / {cat.runs_failed} failed
                   </div>
                 </div>
-                <div className="runs-meta">
-                  {cat.runs_completed} completed / {cat.runs_failed} failed
-                  {!cat.alive && <span className="wounded"> &mdash; wounded</span>}
+              ) : (
+                <div className="card">
+                  <h3 className="card-title">No Cats Yet</h3>
+                  <div className="empty-state">
+                    <p>Create your first cat to begin exploring the catacombs.</p>
+                    <button className="btn btn-primary" onClick={() => setCreating(true)}>
+                      Create Cat
+                    </button>
+                  </div>
                 </div>
-              </>
-            ) : (
-              <div className="empty-state">
-                <p>No cat in your roster yet.</p>
-                <button className="btn btn-primary" onClick={createCat} disabled={pending}>
-                  Summon Cat
-                </button>
-              </div>
-            )}
-          </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -662,18 +856,25 @@ function StatCell({ label, value, hpLevel, accent }: {
 
 // Animation mapping: node type -> cat animation
 const NODE_ANIM: Record<string, string> = {
-  Start: "Cat_Idle",
+  Start: "Idle_Dreamer",
   Combat: "Sword_Attack_Light",
-  Treasure: "Cat_HipHop",
-  Rest: "Cat_Idle",
-  Event: "Looking_Around",
-  Shop: "Cat_Idle",
+  Treasure: "Cat_Robot_Hip_Hop_Dance",
+  Rest: "Cat_Seated_Idle",
+  Event: "Cat_Looking_Around",
+  Shop: "Cat_Waving",
   Boss: "Sword_Attack_Medium",
 };
 
-const PENDING_ANIM = "Cat_Walking";
-const IDLE_ANIM = "Cat_Idle";
-const NO_RUN_ANIM = "Cat_SillyDance";
+const PENDING_ANIM = "Cat_Walking_Backwards";
+const IDLE_ANIM = "Idle_Dreamer";
+
+const DANCE_ANIMS = ["Cat_Macarena_Dance", "Cat_Robot_Hip_Hop_Dance", "Cat_Salsa_Dancing"];
+const IDLE_ANIMS = ["Idle_Dreamer", "Idle_Harmonic", "Idle_Invasive", "Cat_Looking_Around", "Cat_Seated_Idle"];
+
+function pickRandom<T>(arr: T[], exclude?: T): T {
+  const filtered = exclude ? arr.filter(a => a !== exclude) : arr;
+  return filtered[Math.floor(Math.random() * filtered.length)];
+}
 
 function getCatAnimation(
   run: RunState | null,
@@ -681,7 +882,7 @@ function getCatAnimation(
   pending: boolean,
 ): string {
   if (pending) return PENDING_ANIM;
-  if (!run || run.status !== 0) return NO_RUN_ANIM;
+  if (!run || run.status !== 0) return IDLE_ANIM;
   if (currentNodeType) return NODE_ANIM[currentNodeType] ?? IDLE_ANIM;
   return IDLE_ANIM;
 }
@@ -697,15 +898,32 @@ function getCatScene(currentNodeType: string | undefined): string {
   }
 }
 
-function CatViewer({ animation, scene, autoRotate = false }: {
+function CatViewer({ animation, scene, autoRotate = false, appearance }: {
   animation: string;
   scene: string;
   autoRotate?: boolean;
+  appearance?: Record<string, any> | null;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const prevAnimation = useRef(animation);
-  const prevScene = useRef(scene);
-  const prevAutoRotate = useRef(autoRotate);
+  const prevProps = useRef({ animation: "", scene: "", autoRotate: false, appearance: "" });
+  const iframeReady = useRef(false);
+
+  // Listen for ready signal from iframe (Godot finished loading)
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === "catViewer:ready") {
+        iframeReady.current = true;
+        // Re-send full config now that Godot is ready
+        const iframe = iframeRef.current;
+        if (!iframe?.contentWindow) return;
+        const config: Record<string, any> = { animation, scene, autoRotate };
+        if (appearance) Object.assign(config, appearance);
+        iframe.contentWindow.postMessage({ type: "catViewer:configure", config }, "*");
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [animation, scene, autoRotate, appearance]);
 
   // Send configure messages when props change
   useEffect(() => {
@@ -713,18 +931,12 @@ function CatViewer({ animation, scene, autoRotate = false }: {
     if (!iframe?.contentWindow) return;
 
     const config: Record<string, any> = {};
-    if (animation !== prevAnimation.current) {
-      config.animation = animation;
-      prevAnimation.current = animation;
-    }
-    if (scene !== prevScene.current) {
-      config.scene = scene;
-      prevScene.current = scene;
-    }
-    if (autoRotate !== prevAutoRotate.current) {
-      config.autoRotate = autoRotate;
-      prevAutoRotate.current = autoRotate;
-    }
+    if (animation !== prevProps.current.animation) config.animation = animation;
+    if (scene !== prevProps.current.scene) config.scene = scene;
+    if (autoRotate !== prevProps.current.autoRotate) config.autoRotate = autoRotate;
+
+    prevProps.current = { ...prevProps.current, animation, scene, autoRotate };
+
     if (Object.keys(config).length > 0) {
       iframe.contentWindow.postMessage(
         { type: "catViewer:configure", config },
@@ -732,6 +944,17 @@ function CatViewer({ animation, scene, autoRotate = false }: {
       );
     }
   }, [animation, scene, autoRotate]);
+
+  // Send appearance separately — always resend when appearance changes
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow || !appearance) return;
+
+    iframe.contentWindow.postMessage(
+      { type: "catViewer:configure", config: appearance },
+      "*"
+    );
+  }, [appearance]);
 
   const src = useMemo(
     () => `${CAT_VIEWER_BASE}/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=${autoRotate}&camDist=1.5&camY=15&camX=-5`,
@@ -747,6 +970,90 @@ function CatViewer({ animation, scene, autoRotate = false }: {
       className="cat-viewer-panel"
       allow="autoplay"
     />
+  );
+}
+
+function CatCreator({ appearance, onChange, onConfirm, onCancel, pending }: {
+  appearance: AppearanceData;
+  onChange: (a: AppearanceData) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  pending: boolean;
+}) {
+  const set = (field: keyof AppearanceData, value: number) =>
+    onChange({ ...appearance, [field]: value });
+
+  const setColor = (prefix: "primary" | "stripe" | "eye", hex: string) => {
+    const [r, g, b] = hexToRgb(hex);
+    onChange({
+      ...appearance,
+      [`${prefix}R`]: r,
+      [`${prefix}G`]: g,
+      [`${prefix}B`]: b,
+    } as any);
+  };
+
+  return (
+    <div className="card">
+      <h3 className="card-title">Create Your Cat</h3>
+
+      <div className="creator-section">
+        <label className="creator-label">Fur Color</label>
+        <input type="color" className="creator-color"
+          value={rgbToHex(appearance.primaryR, appearance.primaryG, appearance.primaryB)}
+          onChange={e => setColor("primary", e.target.value)} />
+      </div>
+
+      <div className="creator-section">
+        <label className="creator-label">Stripe Color</label>
+        <input type="color" className="creator-color"
+          value={rgbToHex(appearance.stripeR, appearance.stripeG, appearance.stripeB)}
+          onChange={e => setColor("stripe", e.target.value)} />
+      </div>
+
+      <div className="creator-section">
+        <label className="creator-label">Eye Color</label>
+        <input type="color" className="creator-color"
+          value={rgbToHex(appearance.eyeR, appearance.eyeG, appearance.eyeB)}
+          onChange={e => setColor("eye", e.target.value)} />
+      </div>
+
+      <div className="creator-section">
+        <label className="creator-label">Head Size</label>
+        <input type="range" className="creator-slider" min={0} max={15} step={1}
+          value={appearance.headSize} onChange={e => set("headSize", +e.target.value)} />
+      </div>
+
+      <div className="creator-section">
+        <label className="creator-label">Eye Size</label>
+        <input type="range" className="creator-slider" min={0} max={15} step={1}
+          value={appearance.eyeSize} onChange={e => set("eyeSize", +e.target.value)} />
+      </div>
+
+      <div className="creator-section">
+        <label className="creator-label">Body Width</label>
+        <input type="range" className="creator-slider" min={0} max={15} step={1}
+          value={appearance.bodyWidth} onChange={e => set("bodyWidth", +e.target.value)} />
+      </div>
+
+      <div className="creator-section">
+        <label className="creator-label">Tail Size</label>
+        <input type="range" className="creator-slider" min={0} max={15} step={1}
+          value={appearance.tailSize} onChange={e => set("tailSize", +e.target.value)} />
+      </div>
+
+      <div className="creator-buttons">
+        <button className="btn btn-secondary" onClick={() => onChange(randomAppearance())} disabled={pending}>
+          Randomize
+        </button>
+        <button className="btn btn-primary" onClick={onConfirm} disabled={pending}>
+          {pending ? "Creating..." : "Summon Cat"}
+        </button>
+        <button className="btn btn-danger" onClick={onCancel} disabled={pending}>
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 

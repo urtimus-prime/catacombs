@@ -26,10 +26,10 @@ export function setupWorld(provider: DojoProvider) {
   const encAddr = manifest.contracts.find((c: any) => c.tag === "catacombs-encounter_actions")!.address;
 
   const cat_actions = {
-    create_cat: async (account: Account | AccountInterface, repoHash: string) => {
+    create_cat: async (account: Account | AccountInterface, repoHash: string, appearance: string) => {
       return await provider.execute(
         account,
-        { contractName: "cat_actions", entrypoint: "create_cat", calldata: [repoHash] },
+        { contractName: "cat_actions", entrypoint: "create_cat", calldata: [repoHash, appearance] },
         NS, OPTS,
       );
     },
@@ -42,6 +42,9 @@ export function setupWorld(provider: DojoProvider) {
     },
     get_cat: async (catId: number) => {
       return await rawCall(catAddr, "get_cat", [String(catId)]);
+    },
+    get_cat_appearance: async (catId: number) => {
+      return await rawCall(catAddr, "get_cat_appearance", [String(catId)]);
     },
   };
 
