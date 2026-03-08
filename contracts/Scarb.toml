@@ -24,3 +24,5 @@ snforge_std = "0.51.2"
 
 [[target.starknet-contract]]
 build-external-contracts = ["dojo::world::world_contract::world"]
+
+[profile.sepolia]

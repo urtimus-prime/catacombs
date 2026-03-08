@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
 import { useDojoSDK } from "@dojoengine/sdk/react";
+import { RpcProvider } from "starknet";
 import { NODE_TYPES, RUN_STATUS } from "./dojo/models";
+import { RPC_URL } from "./dojo/config";
 
 const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL ?? "";
 
@@ -59,11 +61,29 @@ function hasConnection(connections: number, targetNodeId: number): boolean {
   return (connections & (1 << targetNodeId)) !== 0;
 }
 
+const rpcProvider = new RpcProvider({ nodeUrl: RPC_URL });
+
 function App() {
   const { client } = useDojoSDK();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { account, address } = useAccount();
+  const [autoConnecting, setAutoConnecting] = useState(
+    () => !!localStorage.getItem("lastUsedConnector")
+  );
+
+  useEffect(() => {
+    if (address || !localStorage.getItem("lastUsedConnector")) {
+      setAutoConnecting(false);
+    }
+  }, [address]);
+
+  // Timeout fallback in case auto-connect silently fails
+  useEffect(() => {
+    if (!autoConnecting) return;
+    const timer = setTimeout(() => setAutoConnecting(false), 3000);
+    return () => clearTimeout(timer);
+  }, [autoConnecting]);
 
   const [pending, setPending] = useState(false);
   const [cat, setCat] = useState<CatState | null>(null);
@@ -111,6 +131,10 @@ function App() {
     setNextTxId(prev => prev + 1);
   }, [nextTxId]);
 
+  const waitForTx = useCallback(async (txHash: string) => {
+    await rpcProvider.waitForTransaction(txHash, { retryInterval: 500 });
+  }, []);
+
   const wrap = useCallback(
     async (fn: () => Promise<any>, actionName: string) => {
       if (!account) return;
@@ -121,61 +145,59 @@ function App() {
         const result = await fn();
         if (result?.transaction_hash) {
           addTxLog(actionName, result.transaction_hash);
+          await waitForTx(result.transaction_hash);
         }
         setSuccess(actionName);
+        return result;
       } catch (e: any) {
         setError(e.message ?? String(e));
       } finally {
         setPending(false);
       }
     },
-    [account, addTxLog]
+    [account, addTxLog, waitForTx]
   );
 
   const createCat = () =>
     wrap(async () => {
       const result = await client.cat_actions.create_cat(account!, "12345");
-      setTimeout(() => fetchCat(cat?.id ?? 1), 1000);
       return result;
-    }, "Create Cat");
+    }, "Create Cat").then(() => fetchCat(cat?.id ?? 1));
 
   const startRun = () =>
     wrap(async () => {
       const result = await client.run_actions.start_run(account!, cat?.id ?? 1);
-      setTimeout(async () => {
-        const startId = (run?.id ?? 0) + 1;
-        for (let id = startId; id < startId + 10; id++) {
-          try {
-            const r2 = await client.run_actions.get_run(id);
-            const r = parseRun(r2);
-            if (r.cat_id > 0 && r.status === 0) {
-              await fetchRun(id);
-              return;
-            }
-          } catch { continue; }
-        }
-      }, 1000);
       return result;
-    }, "Start Run");
+    }, "Start Run").then(async () => {
+      const startId = (run?.id ?? 0) + 1;
+      for (let id = startId; id < startId + 10; id++) {
+        try {
+          const r2 = await client.run_actions.get_run(id);
+          const r = parseRun(r2);
+          if (r.cat_id > 0 && r.status === 0) {
+            await fetchRun(id);
+            return;
+          }
+        } catch { continue; }
+      }
+    });
 
   const choosePath = (nodeId: number) =>
     wrap(async () => {
       if (!run) return;
       const result = await client.run_actions.choose_path(account!, run.id, nodeId);
-      setTimeout(() => fetchRun(run.id), 1000);
       return result;
-    }, `Choose Path → Node ${nodeId}`);
+    }, `Choose Path → Node ${nodeId}`).then(() => { if (run) fetchRun(run.id); });
 
   const abandonRun = () =>
     wrap(async () => {
       if (!run) return;
       const result = await client.run_actions.abandon_run(account!, run.id);
-      setTimeout(() => {
-        fetchRun(run.id);
-        fetchCat(cat?.id ?? 1);
-      }, 1000);
       return result;
-    }, "Abandon Run");
+    }, "Abandon Run").then(() => {
+      if (run) fetchRun(run.id);
+      fetchCat(cat?.id ?? 1);
+    });
 
   // Auto-fetch cat and find latest active run on connect
   useEffect(() => {
@@ -213,12 +235,16 @@ function App() {
         <div style={{ ...styles.card, maxWidth: 500, margin: "100px auto", textAlign: "center" }}>
           <h1 style={styles.title}>Catacombs</h1>
           <p style={styles.subtitle}>An on-chain roguelike for cats</p>
-          <button
-            style={styles.button}
-            onClick={() => connect({ connector: connectors[0] })}
-          >
-            Connect Wallet
-          </button>
+          {autoConnecting ? (
+            <p style={{ color: "#718096" }}>Connecting...</p>
+          ) : (
+            <button
+              style={styles.button}
+              onClick={() => connect({ connector: connectors[0] })}
+            >
+              Connect Wallet
+            </button>
+          )}
         </div>
       </div>
     );

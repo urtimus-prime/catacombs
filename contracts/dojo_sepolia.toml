@@ -1,0 +1,12 @@
+[world]
+name = "Catacombs"
+seed = "catacombs"
+
+[namespace]
+default = "catacombs"
+
+[env]
+rpc_url = "https://api.cartridge.gg/x/starknet/sepolia"
+
+[writers]
+"catacombs" = ["catacombs-cat_actions", "catacombs-run_actions", "catacombs-encounter_actions"]

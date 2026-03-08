@@ -5,7 +5,7 @@
 | Environment | Branch | Client URL | Explorer | Chain |
 |-------------|--------|-----------|---------|-------|
 | free | main | `catacombs-free.noods.cc` | `explorer.catacombs.noods.cc` (self-hosted) | Slot Katana (burner) |
-| staging | staging | `catacombs-staging.noods.cc` | Sepolia Starkscan | Sepolia (Controller) |
+| staging | staging | `catacombs-staging.noods.cc` | Sepolia Voyager | Sepolia (Controller) |
 | production | production | `catacombs.noods.cc` | Mainnet Starkscan | Mainnet (Controller) |
 
 ## Railway
@@ -23,10 +23,15 @@
 
 ## Slot (Cartridge)
 - CLI: `/home/paul/.slot/bin/slot`
-- Katana: `https://api.cartridge.gg/x/catacombs/katana` (chain ID: `WP_CATACOMBS`)
-- Torii: `https://api.cartridge.gg/x/catacombs/torii`
-- World: `0x06d0cbcf0cfcc7cf77cfe609816dd4818f56027824216ec0d95df4cf456ed00c`
+- Free (Katana): `https://api.cartridge.gg/x/catacombs/katana` (chain ID: `WP_CATACOMBS`)
+- Free Torii: `https://api.cartridge.gg/x/catacombs/torii`
+- Staging Torii: `https://api.cartridge.gg/x/catacombs-staging/torii` (indexes Sepolia world)
 - Torii config format: flat TOML (`world_address = "...", rpc = "..."`)
+
+## Worlds
+- Free (Slot Katana): `0x06d0cbcf0cfcc7cf77cfe609816dd4818f56027824216ec0d95df4cf456ed00c`
+- Staging (Sepolia): `0x06d0cbcf0cfcc7cf77cfe609816dd4818f56027824216ec0d95df4cf456ed00c`
+- Deployer account (Sepolia): `0x07b74a0227981b8ea8d12bb16276be9f23b3d4d58a5957be6b60688c686e19e3` (keys in `.env`)
 
 ## Cloudflare
 - Token in `.env` as `CLOUDFLARE_TOKEN` — scoped API Token (DNS Zone Edit only)

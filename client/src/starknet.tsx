@@ -10,6 +10,7 @@ import {
 import { Account, RpcProvider, constants } from "starknet";
 import ControllerConnector from "@cartridge/connector/controller";
 import { RPC_URL } from "./dojo/config";
+import { dojoConfig } from "./dojo/config";
 
 const CHAIN = import.meta.env.VITE_CHAIN ?? "katana";
 
@@ -65,11 +66,42 @@ function createKatanaBurner(): Connector {
 }
 
 // --- Controller (Sepolia / Mainnet) ---
+function getContractAddress(tag: string): string {
+  return dojoConfig.manifest.contracts.find((c: any) => c.tag === tag)?.address ?? "0x0";
+}
+
 function createController(): Connector {
   const chainId = CHAIN === "mainnet" ? constants.StarknetChainId.SN_MAIN : constants.StarknetChainId.SN_SEPOLIA;
+  const catAddr = getContractAddress("catacombs-cat_actions");
+  const runAddr = getContractAddress("catacombs-run_actions");
+  const encAddr = getContractAddress("catacombs-encounter_actions");
+
   return new ControllerConnector({
     chains: [{ rpcUrl: RPC_URL }],
     defaultChainId: chainId,
+    policies: {
+      contracts: {
+        [catAddr]: {
+          methods: [
+            { name: "Create Cat", entrypoint: "create_cat", description: "Create a new cat for your roster" },
+            { name: "Verify Cat", entrypoint: "verify_cat", description: "Verify a cat's identity" },
+          ],
+        },
+        [runAddr]: {
+          methods: [
+            { name: "Start Run", entrypoint: "start_run", description: "Begin a new catacomb run" },
+            { name: "Choose Path", entrypoint: "choose_path", description: "Move to a connected node" },
+            { name: "Abandon Run", entrypoint: "abandon_run", description: "Abandon the current run" },
+          ],
+        },
+        [encAddr]: {
+          methods: [
+            { name: "Submit Scenario", entrypoint: "submit_scenario", description: "Submit a scenario for an encounter" },
+            { name: "Resolve Encounter", entrypoint: "resolve_encounter", description: "Resolve an encounter outcome" },
+          ],
+        },
+      },
+    },
   }) as unknown as Connector;
 }
 
@@ -105,6 +137,7 @@ export default function StarknetProvider({ children }: PropsWithChildren) {
       chains={[chain]}
       provider={provider}
       connectors={connectors}
+      autoConnect
     >
       {children}
     </StarknetConfig>
