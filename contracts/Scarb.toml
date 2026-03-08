@@ -1,0 +1,26 @@
+[package]
+cairo-version = "2.13.1"
+name = "catacombs"
+version = "0.1.0"
+edition = "2024_07"
+
+[cairo]
+sierra-replace-ids = true
+
+[tool.scarb]
+allow-prebuilt-plugins = ["dojo_cairo_macros", "snforge_std"]
+
+[dependencies]
+starknet = "2.13.1"
+dojo = "1.8.0"
+
+[scripts]
+test = "snforge test"
+
+[dev-dependencies]
+cairo_test = "2.13.1"
+dojo_snf_test = "1.8.0"
+snforge_std = "0.51.2"
+
+[[target.starknet-contract]]
+build-external-contracts = ["dojo::world::world_contract::world"]

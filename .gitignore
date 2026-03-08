@@ -1,3 +1,5 @@
 .env
 node_modules/
 target/
+dist/
+.snfoundry_cache/

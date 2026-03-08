@@ -7,3 +7,12 @@
 [submodule "reference/nums"]
 	path = reference/nums
 	url = git@github.com:urtimus-prime/nums.git
+[submodule "reference/death-mountain"]
+	path = reference/death-mountain
+	url = https://github.com/provable-games/death-mountain
+[submodule "reference/mirror"]
+	path = reference/mirror
+	url = git@github.com:urtimus-prime/mirror.git
+[submodule "reference/explorer"]
+	path = reference/explorer
+	url = https://github.com/cartridge-gg/explorer.git
