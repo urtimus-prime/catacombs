@@ -31,6 +31,10 @@ jobs:
           context: ./client
           push: true
           tags: ${{ env.IMAGE }}
+          build-args: |
+            VITE_RPC_URL=${{ vars.VITE_RPC_URL }}
+            VITE_TORII_URL=${{ vars.VITE_TORII_URL }}
+            VITE_CHAIN=${{ vars.VITE_CHAIN }}
 
       - name: Set Railway image source
         run: |
@@ -49,29 +53,3 @@ jobs:
             -d '{
               "query": "mutation { serviceInstanceDeployV2(serviceId: \"${{ vars.RAILWAY_SERVICE_ID }}\", environmentId: \"${{ vars.RAILWAY_ENV_ID }}\") }"
             }'
-
-      - name: Set up DNS on Cloudflare
-        run: |
-          ZONE_ID="d41fdeec4e58d62a742e23805ab6f31a"
-          DOMAIN="${{ vars.URL }}"
-
-          # Check if record exists
-          EXISTING=$(curl -sf "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$DOMAIN&account.id=${{ vars.CF_ACCOUNT_ID }}" \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_TOKEN }}")
-
-          RECORD_ID=$(echo "$EXISTING" | jq -r '.result[0].id // empty')
-
-          if [ -n "$RECORD_ID" ]; then
-            echo "DNS record exists, skipping"
-          else
-            echo "Creating CNAME record for $DOMAIN"
-            curl -sf -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-              -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"type\": \"CNAME\",
-                \"name\": \"catacombs\",
-                \"content\": \"${{ vars.RAILWAY_DOMAIN }}\",
-                \"proxied\": true
-              }"
-          fi

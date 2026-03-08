@@ -17,7 +17,7 @@ async function main() {
     domain: {
       name: "catacombs",
       version: "1.0",
-      chainId: "KATANA",
+      chainId: import.meta.env.VITE_CHAIN === "sepolia" ? "SN_SEPOLIA" : "KATANA",
       revision: "1",
     },
   });

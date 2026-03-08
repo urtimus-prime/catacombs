@@ -3,6 +3,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ARG VITE_RPC_URL
+ARG VITE_TORII_URL
+ARG VITE_CHAIN
 RUN npx vite build
 
 FROM nginx:alpine

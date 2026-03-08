@@ -1,9 +1,19 @@
 import type { PropsWithChildren } from "react";
+import { sepolia } from "@starknet-react/chains";
 import { Chain } from "@starknet-react/chains";
-import { jsonRpcProvider, StarknetConfig, MockConnector } from "@starknet-react/core";
-import { Account, RpcProvider } from "starknet";
+import {
+  jsonRpcProvider,
+  StarknetConfig,
+  MockConnector,
+  type Connector,
+} from "@starknet-react/core";
+import { Account, RpcProvider, constants } from "starknet";
+import ControllerConnector from "@cartridge/connector/controller";
 import { RPC_URL } from "./dojo/config";
 
+const CHAIN = import.meta.env.VITE_CHAIN ?? "katana";
+
+// --- Katana (local dev) ---
 const KATANA_CHAIN_ID = "0x4b4154414e41";
 
 const katana: Chain = {
@@ -26,7 +36,6 @@ const katana: Chain = {
   },
 } as Chain;
 
-// Katana predeployed accounts
 const KATANA_ACCOUNTS = [
   {
     address: "0x127fd5f1fe78a71f8bcd1fec63e3fe2f0486b6ecd5c86a0466c3a21fa5cfcec",
@@ -38,29 +47,42 @@ const KATANA_ACCOUNTS = [
   },
 ];
 
-const starkProvider = new RpcProvider({ nodeUrl: RPC_URL });
-const accounts = KATANA_ACCOUNTS.map(
-  (a) =>
-    new Account({
-      provider: starkProvider,
-      address: a.address,
-      signer: a.privateKey,
-    }),
-);
+function createKatanaBurner(): Connector {
+  const starkProvider = new RpcProvider({ nodeUrl: RPC_URL });
+  const accounts = KATANA_ACCOUNTS.map(
+    (a) =>
+      new Account({
+        provider: starkProvider,
+        address: a.address,
+        signer: a.privateKey,
+      }),
+  );
+  return new MockConnector({
+    accounts: { sepolia: accounts, mainnet: accounts },
+    options: { id: "katana-burner", name: "Katana Burner" },
+  });
+}
 
-const katanaBurner = new MockConnector({
-  accounts: { sepolia: accounts, mainnet: accounts },
-  options: { id: "katana-burner", name: "Katana Burner" },
-});
+// --- Sepolia (testnet / production) ---
+function createController(): Connector {
+  return new ControllerConnector({
+    chains: [{ rpcUrl: RPC_URL }],
+    defaultChainId: constants.StarknetChainId.SN_SEPOLIA,
+  }) as unknown as Connector;
+}
 
+// --- Provider setup ---
+const isTestnet = CHAIN === "sepolia";
+const chain = isTestnet ? sepolia : katana;
+const connectors = [isTestnet ? createController() : createKatanaBurner()];
 const provider = jsonRpcProvider({ rpc: () => ({ nodeUrl: RPC_URL }) });
 
 export default function StarknetProvider({ children }: PropsWithChildren) {
   return (
     <StarknetConfig
-      chains={[katana]}
+      chains={[chain]}
       provider={provider}
-      connectors={[katanaBurner]}
+      connectors={connectors}
     >
       {children}
     </StarknetConfig>
