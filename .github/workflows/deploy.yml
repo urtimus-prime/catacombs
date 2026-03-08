@@ -1,0 +1,77 @@
+name: Deploy Client
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}/client:latest
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./client
+          push: true
+          tags: ${{ env.IMAGE }}
+
+      - name: Set Railway image source
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            https://backboard.railway.com/graphql/v2 \
+            -d '{
+              "query": "mutation { serviceInstanceUpdate(serviceId: \"${{ vars.RAILWAY_SERVICE_ID }}\", environmentId: \"${{ vars.RAILWAY_ENV_ID }}\", input: { source: { image: \"${{ env.IMAGE }}\" } }) }"
+            }'
+
+      - name: Deploy on Railway
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            https://backboard.railway.com/graphql/v2 \
+            -d '{
+              "query": "mutation { serviceInstanceDeployV2(serviceId: \"${{ vars.RAILWAY_SERVICE_ID }}\", environmentId: \"${{ vars.RAILWAY_ENV_ID }}\") }"
+            }'
+
+      - name: Set up DNS on Cloudflare
+        run: |
+          ZONE_ID="d41fdeec4e58d62a742e23805ab6f31a"
+          DOMAIN="${{ vars.URL }}"
+
+          # Check if record exists
+          EXISTING=$(curl -sf "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$DOMAIN&account.id=${{ vars.CF_ACCOUNT_ID }}" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_TOKEN }}")
+
+          RECORD_ID=$(echo "$EXISTING" | jq -r '.result[0].id // empty')
+
+          if [ -n "$RECORD_ID" ]; then
+            echo "DNS record exists, skipping"
+          else
+            echo "Creating CNAME record for $DOMAIN"
+            curl -sf -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+              -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"type\": \"CNAME\",
+                \"name\": \"catacombs\",
+                \"content\": \"${{ vars.RAILWAY_DOMAIN }}\",
+                \"proxied\": true
+              }"
+          fi
