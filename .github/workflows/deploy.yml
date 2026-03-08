@@ -1,4 +1,4 @@
-name: Deploy Client
+name: Deploy
 
 on:
   push:
@@ -6,10 +6,11 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: ghcr.io/${{ github.repository }}/client:latest
+  CLIENT_IMAGE: ghcr.io/${{ github.repository }}/client:latest
+  EXPLORER_IMAGE: ghcr.io/${{ github.repository }}/explorer:latest
 
 jobs:
-  deploy:
+  deploy-client:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -17,6 +18,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -30,11 +33,12 @@ jobs:
         with:
           context: ./client
           push: true
-          tags: ${{ env.IMAGE }}
+          tags: ${{ env.CLIENT_IMAGE }}
           build-args: |
             VITE_RPC_URL=${{ vars.VITE_RPC_URL }}
             VITE_TORII_URL=${{ vars.VITE_TORII_URL }}
             VITE_CHAIN=${{ vars.VITE_CHAIN }}
+            VITE_EXPLORER_URL=${{ vars.VITE_EXPLORER_URL }}
 
       - name: Set Railway image source
         run: |
@@ -42,7 +46,7 @@ jobs:
             -H "Content-Type: application/json" \
             https://backboard.railway.com/graphql/v2 \
             -d '{
-              "query": "mutation { serviceInstanceUpdate(serviceId: \"${{ vars.RAILWAY_SERVICE_ID }}\", environmentId: \"${{ vars.RAILWAY_ENV_ID }}\", input: { source: { image: \"${{ env.IMAGE }}\" } }) }"
+              "query": "mutation { serviceInstanceUpdate(serviceId: \"${{ vars.RAILWAY_SERVICE_ID }}\", environmentId: \"${{ vars.RAILWAY_ENV_ID }}\", input: { source: { image: \"${{ env.CLIENT_IMAGE }}\" } }) }"
             }'
 
       - name: Deploy on Railway
@@ -52,4 +56,50 @@ jobs:
             https://backboard.railway.com/graphql/v2 \
             -d '{
               "query": "mutation { serviceInstanceDeployV2(serviceId: \"${{ vars.RAILWAY_SERVICE_ID }}\", environmentId: \"${{ vars.RAILWAY_ENV_ID }}\") }"
+            }'
+
+  deploy-explorer:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Explorer image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./explorer/Dockerfile
+          push: true
+          tags: ${{ env.EXPLORER_IMAGE }}
+          build-args: |
+            VITE_RPC_URL=${{ vars.VITE_RPC_URL }}
+
+      - name: Set Railway image source
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            https://backboard.railway.com/graphql/v2 \
+            -d '{
+              "query": "mutation { serviceInstanceUpdate(serviceId: \"${{ vars.RAILWAY_EXPLORER_SERVICE_ID }}\", environmentId: \"${{ vars.RAILWAY_ENV_ID }}\", input: { source: { image: \"${{ env.EXPLORER_IMAGE }}\" } }) }"
+            }'
+
+      - name: Deploy on Railway
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            https://backboard.railway.com/graphql/v2 \
+            -d '{
+              "query": "mutation { serviceInstanceDeployV2(serviceId: \"${{ vars.RAILWAY_EXPLORER_SERVICE_ID }}\", environmentId: \"${{ vars.RAILWAY_ENV_ID }}\") }"
             }'
