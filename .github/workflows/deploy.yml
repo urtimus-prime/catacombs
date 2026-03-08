@@ -12,7 +12,7 @@ env:
 jobs:
   deploy-client:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'staging' && 'staging' || 'production' }}
+    environment: ${{ github.ref_name == 'staging' && 'staging' || 'free' }}
     permissions:
       contents: read
       packages: write
@@ -60,7 +60,7 @@ jobs:
   deploy-explorer:
     if: github.ref_name != 'staging'
     runs-on: ubuntu-latest
-    environment: production
+    environment: free
     permissions:
       contents: read
       packages: write

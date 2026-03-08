@@ -4,7 +4,7 @@
 
 | Environment | Branch | Client URL | Explorer URL | Chain |
 |-------------|--------|-----------|-------------|-------|
-| production | main | `catacombs-free.noods.cc` | `explorer.catacombs.noods.cc` | Slot Katana (burner) |
+| free | main | `catacombs-free.noods.cc` | `explorer.catacombs.noods.cc` | Slot Katana (burner) |
 | staging | staging | `catacombs-staging.noods.cc` | `explorer-staging.catacombs.noods.cc` | Sepolia (Controller) |
 
 ## Railway
@@ -36,7 +36,7 @@
 ## GitHub
 - PAT in `.env` as `GITHUB_PAT_URTIMUS_PRIME`
 - Push: `git push https://${GITHUB_PAT_URTIMUS_PRIME}@github.com/urtimus-prime/catacombs.git <branch>`
-- Deploy variables are scoped per GitHub environment (production/staging), not repo-level
+- Deploy variables are scoped per GitHub environment (free/staging), not repo-level
 
 ## Client VITE_CHAIN modes
 - `katana` — local Katana, MockConnector (burner accounts)
