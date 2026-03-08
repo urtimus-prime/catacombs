@@ -90,7 +90,7 @@ body::after {
   min-height: 100vh;
   max-width: 920px;
   margin: 0 auto;
-  padding: 24px 20px 80px;
+  padding: 20px 20px 80px;
 }
 
 /* ===== CONNECT SCREEN ===== */
@@ -105,14 +105,7 @@ body::after {
   overflow: hidden;
 }
 
-.cat-viewer-iframe {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border: none;
-  z-index: 0;
-}
+/* (cat-viewer-iframe replaced by cat-viewer-slot system) */
 
 .connect-card {
   position: relative;
@@ -281,21 +274,63 @@ body::after {
   margin: 0 0 16px;
 }
 
-/* ===== GAME LAYOUT ===== */
+/* ===== CAT VIEWER SLOT (always mounted) ===== */
 
-.game-layout {
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 16px;
+.cat-viewer-slot {
   margin-bottom: 16px;
-  align-items: start;
+}
+
+.cat-viewer-slot iframe {
+  width: 100%;
+  border: 1px solid var(--stone-700);
+  background: var(--stone-900);
+  display: block;
+}
+
+/* Cats tab: large viewer */
+.cat-viewer-slot.slot-cats iframe {
+  aspect-ratio: 4 / 5;
+  max-height: 480px;
+}
+
+/* Catacombs tab: compact viewer */
+.cat-viewer-slot.slot-catacombs iframe {
+  aspect-ratio: 16 / 10;
+  max-height: 260px;
+}
+
+/* Connect screen: fullscreen background */
+.cat-viewer-slot.slot-connect {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  z-index: 0;
+}
+
+.cat-viewer-slot.slot-connect iframe {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: unset;
+  max-height: none;
+  border: none;
+}
+
+/* Player tab: hide viewer without unloading */
+.cat-viewer-slot.slot-player {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0;
 }
 
 .cat-viewer-panel {
   width: 100%;
   aspect-ratio: 3 / 4;
-  border: 1px solid var(--stone-700);
-  background: var(--stone-900);
+  border: none;
+  background: none;
   display: block;
 }
 
@@ -651,6 +686,136 @@ body::after {
   background: rgba(59, 130, 246, 0.1);
 }
 
+/* ===== TAB BAR ===== */
+
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: var(--stone-900);
+  border-top: 1px solid var(--stone-700);
+  z-index: 90;
+  padding: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 0 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.tab-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: transparent;
+  transition: background 0.2s ease;
+}
+
+.tab-btn.active::before {
+  background: var(--amber-500);
+}
+
+.tab-icon {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--stone-500);
+  transition: color 0.15s ease;
+}
+
+.tab-btn.active .tab-icon {
+  color: var(--amber-400);
+}
+
+.tab-btn:not(.active):hover .tab-icon {
+  color: var(--stone-300);
+}
+
+.tab-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--stone-500);
+  transition: color 0.15s ease;
+}
+
+.tab-btn.active .tab-label {
+  color: var(--amber-400);
+}
+
+.tab-btn:not(.active):hover .tab-label {
+  color: var(--stone-300);
+}
+
+/* ===== TAB CONTENT ===== */
+
+.tab-content {
+  animation: tab-fade 0.2s ease;
+}
+
+@keyframes tab-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== PLAYER TAB ===== */
+
+.player-field {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--stone-800);
+}
+
+.player-field:last-of-type {
+  border-bottom: none;
+}
+
+.player-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--stone-500);
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.player-value {
+  font-size: 13px;
+  color: var(--stone-200);
+}
+
+.player-address {
+  font-size: 11px;
+  word-break: break-all;
+  cursor: pointer;
+  color: var(--frost-400);
+  transition: color 0.15s ease;
+}
+
+.player-address:hover {
+  color: var(--frost-300, #93c5fd);
+}
+
 /* ===== PENDING OVERLAY ===== */
 
 .pending-indicator {
@@ -746,15 +911,14 @@ body::after {
     padding: 4px 10px;
   }
 
-  /* Game layout: stack vertically on mobile */
-  .game-layout {
-    grid-template-columns: 1fr;
-    gap: 12px;
+  /* Cat viewer slot on mobile */
+  .cat-viewer-slot.slot-cats iframe {
+    aspect-ratio: 1 / 1;
+    max-height: 320px;
   }
 
-  .cat-viewer-panel {
-    aspect-ratio: 16 / 10;
-    max-height: 240px;
+  .cat-viewer-slot.slot-catacombs iframe {
+    max-height: 200px;
   }
 
   .panels-column {
@@ -860,15 +1024,16 @@ body::after {
     word-break: break-word;
   }
 
-  /* Pending indicator */
+  /* Pending indicator - above tab bar on mobile */
   .pending-indicator {
-    bottom: 12px;
+    bottom: 64px;
     left: 12px;
     right: 12px;
     justify-content: center;
     font-size: 11px;
     padding: 10px 16px;
   }
+
 
   /* HP bar */
   .hp-bar-container {

@@ -7,9 +7,11 @@ import { RPC_URL } from "./dojo/config";
 import "./App.css";
 
 const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL ?? "";
+// Bump CAT_VIEWER_VERSION when rebuilding Godot, then upload to R2 under the new path
+const CAT_VIEWER_VERSION = "v1";
 const CAT_VIEWER_BASE = import.meta.env.DEV
   ? "/cat-viewer"
-  : "https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer";
+  : `https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer/${CAT_VIEWER_VERSION}`;
 
 const NODE_ICONS: Record<string, string> = {
   Start: "\u2302", Combat: "\u2694", Treasure: "\u2666",
@@ -76,11 +78,14 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+type Tab = "cats" | "catacombs" | "player";
+
 function App() {
   const { client } = useDojoSDK();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { account, address } = useAccount();
+  const [tab, setTab] = useState<Tab>("catacombs");
   const [autoConnecting, setAutoConnecting] = useState(
     () => !!localStorage.getItem("lastUsedConnector")
   );
@@ -307,15 +312,22 @@ function App() {
     })();
   }, [address, client, fetchCat, fetchRun]);
 
-  // ===== CONNECT SCREEN =====
-  if (!address) {
-    return (
-      <div className="connect-screen">
-        <iframe
-          src={`${CAT_VIEWER_BASE}/embed.html?scene=cosmic_void&autoRotate=true&animation=Cat_Idle`}
-          className="cat-viewer-iframe"
-          allow="autoplay"
-        />
+  const connected = !!address;
+  const currentNode = nodes.find(n => n.node_id === run?.current_node_id);
+  const currentNodeType = currentNode ? NODE_TYPES[currentNode.node_type] : undefined;
+  const catAnimation = connected ? getCatAnimation(run, currentNodeType, pending) : "Cat_Idle";
+  const catScene = connected ? getCatScene(currentNodeType) : "cosmic_void";
+  const viewerSlotClass = connected ? `cat-viewer-slot slot-${tab}` : "cat-viewer-slot slot-connect";
+
+  return (
+    <div className={connected ? "app" : "connect-screen"}>
+      {/* Always-mounted cat viewer — never unmounts across screens or tabs */}
+      <div className={viewerSlotClass}>
+        <CatViewer animation={catAnimation} scene={catScene} autoRotate={!connected} />
+      </div>
+
+      {/* ===== CONNECT SCREEN ===== */}
+      {!connected && (
         <div className="connect-card">
           <h1 className="connect-title">Catacombs</h1>
           <p className="connect-subtitle">An on-chain roguelike for cats</p>
@@ -331,181 +343,292 @@ function App() {
             </button>
           )}
         </div>
-      </div>
-    );
-  }
-
-  const currentNode = nodes.find(n => n.node_id === run?.current_node_id);
-  const currentNodeType = currentNode ? NODE_TYPES[currentNode.node_type] : undefined;
-  const catAnimation = getCatAnimation(run, currentNodeType, pending);
-  const catScene = getCatScene(currentNodeType);
-
-  return (
-    <div className="app">
-      {/* Header */}
-      <header className="header">
-        <h1 className="header-title">Catacombs</h1>
-        <div className="header-right">
-          <span className="header-address">
-            {address.slice(0, 6)}...{address.slice(-4)}
-          </span>
-          <button className="btn-disconnect" onClick={() => disconnect()}>
-            Disconnect
-          </button>
-        </div>
-      </header>
-
-      {/* Alerts */}
-      {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
-
-      {/* Cat Viewer + Panels */}
-      <div className="game-layout">
-        <CatViewer animation={catAnimation} scene={catScene} />
-        <div className="panels-column">
-        {/* Cat Panel */}
-        <div className="card">
-          <h3 className="card-title">Cat</h3>
-          {cat ? (
-            <>
-              <div className="stats-grid">
-                <StatCell label="ID" value={`#${cat.id}`} />
-                <StatCell label="Level" value={cat.level} accent />
-                <StatCell label="XP" value={cat.xp} />
-                <StatCell label="HP" value={`${cat.hp}/${cat.max_hp}`}
-                  hpLevel={cat.hp / cat.max_hp} />
-                <StatCell label="ATK" value={cat.attack} />
-                <StatCell label="DEF" value={cat.defense} />
-                <StatCell label="SPD" value={cat.speed} />
-                <StatCell label="LCK" value={cat.luck} />
-              </div>
-              <div className="hp-bar-container">
-                <div className="hp-bar-track">
-                  <div
-                    className={`hp-bar-fill ${
-                      cat.hp / cat.max_hp > 0.66 ? 'high' :
-                      cat.hp / cat.max_hp > 0.33 ? 'mid' : 'low'
-                    }`}
-                    style={{ width: `${(cat.hp / cat.max_hp) * 100}%` }}
-                  />
-                </div>
-              </div>
-              <div className="runs-meta">
-                {cat.runs_completed} completed / {cat.runs_failed} failed
-                {!cat.alive && <span className="wounded"> &mdash; wounded</span>}
-              </div>
-            </>
-          ) : (
-            <div className="empty-state">
-              <p>No cat in your roster yet.</p>
-              <button className="btn btn-primary" onClick={createCat} disabled={pending}>
-                Summon Cat
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Run Panel */}
-        <div className="card">
-          <h3 className="card-title">Run</h3>
-          {run && run.status === 0 ? (
-            <>
-              <div className="stats-grid">
-                <StatCell label="Run" value={`#${run.id}`} />
-                <StatCell label="Floor" value={`${run.floor}/${run.max_floors}`} />
-                <StatCell label="Position" value={
-                  run.current_node_id === 0 ? "Start" :
-                  run.current_node_id === 6 ? "Boss" :
-                  `Node ${run.current_node_id}`
-                } />
-                <StatCell label="Visited" value={run.nodes_visited} />
-                <StatCell label="Score" value={run.score} accent />
-                <StatCell label="Status" value={RUN_STATUS[run.status]}
-                  hpLevel={1} />
-              </div>
-              <div style={{ marginTop: 16 }}>
-                <button className="btn btn-danger" onClick={abandonRun} disabled={pending}>
-                  Abandon Run
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="empty-state">
-              <p>
-                {run ? `Last run: ${RUN_STATUS[run.status]}` : "No active run"}
-              </p>
-              {cat && (
-                <button className="btn btn-primary" onClick={startRun}
-                  disabled={pending || !cat.alive}>
-                  Begin Descent
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        </div>
-      </div>
-
-      {/* Map */}
-      {run && run.status === 0 && (
-        <MapView
-          run={run}
-          nodes={nodes}
-          currentConnections={currentNode?.connections ?? 0}
-          onChoosePath={choosePath}
-          pending={pending}
-        />
       )}
 
-      {/* Activity Log */}
-      {txLogs.length > 0 && (
-        <div className="card">
-          <div className="log-header">
-            <h3 className="card-title" style={{ margin: 0 }}>Activity Log</h3>
-            <button className="btn-clear" onClick={() => setTxLogs([])}>Clear</button>
-          </div>
-          <div className="log-table">
-            <div className="log-row log-row-header">
-              <span>#</span>
-              <span>Action</span>
-              <span>Transaction</span>
-              <span style={{ textAlign: "right" }}>Time</span>
-            </div>
-            {txLogs.map((log) => (
-              <div key={log.id} className="log-row">
-                <span className="log-num">{log.id}</span>
-                <span className="log-action">{log.action}</span>
-                <span>
-                  {EXPLORER_URL ? (
-                    <a
-                      href={`${EXPLORER_URL}/tx/${log.txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="log-hash"
-                    >
-                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x2197;
-                    </a>
-                  ) : (
-                    <span
-                      className="log-hash"
-                      style={{ cursor: "pointer" }}
-                      onClick={() => navigator.clipboard.writeText(log.txHash)}
-                    >
-                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x29C9;
-                    </span>
-                  )}
-                </span>
-                <span className="log-time">
-                  {new Date(log.timestamp).toLocaleTimeString()}
-                </span>
+      {/* Alerts */}
+      {connected && error && <div className="alert alert-error">{error}</div>}
+      {connected && success && <div className="alert alert-success">{success}</div>}
+
+      {/* ===== CATS TAB ===== */}
+      {connected && tab === "cats" && (
+        <div className="tab-content">
+          <div className="card">
+            <h3 className="card-title">Cat</h3>
+            {cat ? (
+              <>
+                <div className="stats-grid">
+                  <StatCell label="ID" value={`#${cat.id}`} />
+                  <StatCell label="Level" value={cat.level} accent />
+                  <StatCell label="XP" value={cat.xp} />
+                  <StatCell label="HP" value={`${cat.hp}/${cat.max_hp}`}
+                    hpLevel={cat.hp / cat.max_hp} />
+                  <StatCell label="ATK" value={cat.attack} />
+                  <StatCell label="DEF" value={cat.defense} />
+                  <StatCell label="SPD" value={cat.speed} />
+                  <StatCell label="LCK" value={cat.luck} />
+                </div>
+                <div className="hp-bar-container">
+                  <div className="hp-bar-track">
+                    <div
+                      className={`hp-bar-fill ${
+                        cat.hp / cat.max_hp > 0.66 ? 'high' :
+                        cat.hp / cat.max_hp > 0.33 ? 'mid' : 'low'
+                      }`}
+                      style={{ width: `${(cat.hp / cat.max_hp) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="runs-meta">
+                  {cat.runs_completed} completed / {cat.runs_failed} failed
+                  {!cat.alive && <span className="wounded"> &mdash; wounded</span>}
+                </div>
+              </>
+            ) : (
+              <div className="empty-state">
+                <p>No cat in your roster yet.</p>
+                <button className="btn btn-primary" onClick={createCat} disabled={pending}>
+                  Summon Cat
+                </button>
               </div>
-            ))}
+            )}
           </div>
         </div>
+      )}
+
+      {/* ===== CATACOMBS TAB ===== */}
+      {connected && tab === "catacombs" && (
+        <div className="tab-content">
+          <div className="panels-column">
+              {/* Run Panel */}
+              <div className="card">
+                <h3 className="card-title">Run</h3>
+                {run && run.status === 0 ? (
+                  <>
+                    <div className="stats-grid">
+                      <StatCell label="Run" value={`#${run.id}`} />
+                      <StatCell label="Floor" value={`${run.floor}/${run.max_floors}`} />
+                      <StatCell label="Position" value={
+                        run.current_node_id === 0 ? "Start" :
+                        run.current_node_id === 6 ? "Boss" :
+                        `Node ${run.current_node_id}`
+                      } />
+                      <StatCell label="Visited" value={run.nodes_visited} />
+                      <StatCell label="Score" value={run.score} accent />
+                      <StatCell label="Status" value={RUN_STATUS[run.status]}
+                        hpLevel={1} />
+                    </div>
+                    <div style={{ marginTop: 16 }}>
+                      <button className="btn btn-danger" onClick={abandonRun} disabled={pending}>
+                        Abandon Run
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="empty-state">
+                    <p>
+                      {run ? `Last run: ${RUN_STATUS[run.status]}` : "No active run"}
+                    </p>
+                    {cat ? (
+                      <button className="btn btn-primary" onClick={startRun}
+                        disabled={pending || !cat.alive}>
+                        Begin Descent
+                      </button>
+                    ) : (
+                      <p style={{ fontSize: 12, color: "var(--stone-500)" }}>
+                        Summon a cat first in the Cats tab
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick cat stats */}
+              {cat && (
+                <div className="card">
+                  <h3 className="card-title">Cat #{cat.id}</h3>
+                  <div className="stats-grid">
+                    <StatCell label="HP" value={`${cat.hp}/${cat.max_hp}`}
+                      hpLevel={cat.hp / cat.max_hp} />
+                    <StatCell label="ATK" value={cat.attack} />
+                    <StatCell label="DEF" value={cat.defense} />
+                    <StatCell label="LVL" value={cat.level} accent />
+                  </div>
+                </div>
+              )}
+          </div>
+
+          {/* Map */}
+          {run && run.status === 0 && (
+            <MapView
+              run={run}
+              nodes={nodes}
+              currentConnections={currentNode?.connections ?? 0}
+              onChoosePath={choosePath}
+              pending={pending}
+            />
+          )}
+
+          {/* Activity Log */}
+          {txLogs.length > 0 && (
+            <div className="card">
+              <div className="log-header">
+                <h3 className="card-title" style={{ margin: 0 }}>Activity Log</h3>
+                <button className="btn-clear" onClick={() => setTxLogs([])}>Clear</button>
+              </div>
+              <div className="log-table">
+                <div className="log-row log-row-header">
+                  <span>#</span>
+                  <span>Action</span>
+                  <span>Transaction</span>
+                  <span style={{ textAlign: "right" }}>Time</span>
+                </div>
+                {txLogs.map((log) => (
+                  <div key={log.id} className="log-row">
+                    <span className="log-num">{log.id}</span>
+                    <span className="log-action">{log.action}</span>
+                    <span>
+                      {EXPLORER_URL ? (
+                        <a
+                          href={`${EXPLORER_URL}/tx/${log.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="log-hash"
+                        >
+                          {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x2197;
+                        </a>
+                      ) : (
+                        <span
+                          className="log-hash"
+                          style={{ cursor: "pointer" }}
+                          onClick={() => navigator.clipboard.writeText(log.txHash)}
+                        >
+                          {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x29C9;
+                        </span>
+                      )}
+                    </span>
+                    <span className="log-time">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== PLAYER TAB ===== */}
+      {connected && tab === "player" && (
+        <div className="tab-content">
+          <div className="card">
+            <h3 className="card-title">Player</h3>
+            <div className="player-field">
+              <span className="player-label">Wallet</span>
+              <span
+                className="player-value player-address"
+                onClick={() => navigator.clipboard.writeText(address)}
+                title="Click to copy"
+              >
+                {address}
+              </span>
+            </div>
+            {cat && (
+              <div className="player-field">
+                <span className="player-label">Cat</span>
+                <span className="player-value">#{cat.id} &middot; Level {cat.level}</span>
+              </div>
+            )}
+            {run && (
+              <div className="player-field">
+                <span className="player-label">Last Run</span>
+                <span className="player-value">#{run.id} &middot; {RUN_STATUS[run.status]}</span>
+              </div>
+            )}
+            <div style={{ marginTop: 20 }}>
+              <button className="btn btn-danger" onClick={() => disconnect()}>
+                Disconnect Wallet
+              </button>
+            </div>
+          </div>
+
+          {/* Full tx history */}
+          {txLogs.length > 0 && (
+            <div className="card">
+              <div className="log-header">
+                <h3 className="card-title" style={{ margin: 0 }}>Transaction History</h3>
+                <button className="btn-clear" onClick={() => setTxLogs([])}>Clear</button>
+              </div>
+              <div className="log-table">
+                <div className="log-row log-row-header">
+                  <span>#</span>
+                  <span>Action</span>
+                  <span>Transaction</span>
+                  <span style={{ textAlign: "right" }}>Time</span>
+                </div>
+                {txLogs.map((log) => (
+                  <div key={log.id} className="log-row">
+                    <span className="log-num">{log.id}</span>
+                    <span className="log-action">{log.action}</span>
+                    <span>
+                      {EXPLORER_URL ? (
+                        <a
+                          href={`${EXPLORER_URL}/tx/${log.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="log-hash"
+                        >
+                          {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x2197;
+                        </a>
+                      ) : (
+                        <span
+                          className="log-hash"
+                          style={{ cursor: "pointer" }}
+                          onClick={() => navigator.clipboard.writeText(log.txHash)}
+                        >
+                          {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x29C9;
+                        </span>
+                      )}
+                    </span>
+                    <span className="log-time">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab Bar */}
+      {connected && (
+        <nav className="tab-bar">
+          <button
+            className={`tab-btn ${tab === "cats" ? "active" : ""}`}
+            onClick={() => setTab("cats")}
+          >
+            <span className="tab-icon">{"\u2666"}</span>
+            <span className="tab-label">Cats</span>
+          </button>
+          <button
+            className={`tab-btn ${tab === "catacombs" ? "active" : ""}`}
+            onClick={() => setTab("catacombs")}
+          >
+            <span className="tab-icon">{"\u2302"}</span>
+            <span className="tab-label">Catacombs</span>
+          </button>
+          <button
+            className={`tab-btn ${tab === "player" ? "active" : ""}`}
+            onClick={() => setTab("player")}
+          >
+            <span className="tab-icon">{"\u2605"}</span>
+            <span className="tab-label">Player</span>
+          </button>
+        </nav>
       )}
 
       {/* Pending indicator */}
-      {pending && (
+      {connected && pending && (
         <div className="pending-indicator">
           <div className="pending-dot" />
           Processing transaction...
@@ -574,14 +697,15 @@ function getCatScene(currentNodeType: string | undefined): string {
   }
 }
 
-function CatViewer({ animation, scene, className }: {
+function CatViewer({ animation, scene, autoRotate = false }: {
   animation: string;
   scene: string;
-  className?: string;
+  autoRotate?: boolean;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const prevAnimation = useRef(animation);
   const prevScene = useRef(scene);
+  const prevAutoRotate = useRef(autoRotate);
 
   // Send configure messages when props change
   useEffect(() => {
@@ -597,16 +721,20 @@ function CatViewer({ animation, scene, className }: {
       config.scene = scene;
       prevScene.current = scene;
     }
+    if (autoRotate !== prevAutoRotate.current) {
+      config.autoRotate = autoRotate;
+      prevAutoRotate.current = autoRotate;
+    }
     if (Object.keys(config).length > 0) {
       iframe.contentWindow.postMessage(
         { type: "catViewer:configure", config },
         "*"
       );
     }
-  }, [animation, scene]);
+  }, [animation, scene, autoRotate]);
 
   const src = useMemo(
-    () => `${CAT_VIEWER_BASE}/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=false&camDist=1.5&camY=15&camX=-5`,
+    () => `${CAT_VIEWER_BASE}/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=${autoRotate}&camDist=1.5&camY=15&camX=-5`,
     // Only set src once on mount — subsequent changes use postMessage
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -616,7 +744,7 @@ function CatViewer({ animation, scene, className }: {
     <iframe
       ref={iframeRef}
       src={src}
-      className={className ?? "cat-viewer-panel"}
+      className="cat-viewer-panel"
       allow="autoplay"
     />
   );
