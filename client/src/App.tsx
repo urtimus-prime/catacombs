@@ -3,6 +3,8 @@ import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
 import { useDojoSDK } from "@dojoengine/sdk/react";
 import { NODE_TYPES, RUN_STATUS } from "./dojo/models";
 
+const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL ?? "";
+
 interface TxLog {
   id: number;
   action: string;
@@ -345,15 +347,21 @@ function App() {
                 <span style={{ width: 40, color: "#718096" }}>{log.id}</span>
                 <span style={{ flex: 1, color: "#e2e8f0", fontWeight: "bold" }}>{log.action}</span>
                 <span style={{ width: 340 }}>
-                  <a
-                    href={`http://localhost:3004/tx/${log.txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={styles.txHash}
-                    title={`View in Explorer: ${log.txHash}`}
-                  >
-                    {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} ↗
-                  </a>
+                  {EXPLORER_URL ? (
+                    <a
+                      href={`${EXPLORER_URL}/tx/${log.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={styles.txHash}
+                      title={`View in Explorer: ${log.txHash}`}
+                    >
+                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} ↗
+                    </a>
+                  ) : (
+                    <span style={styles.txHash} title={log.txHash}>
+                      {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)}
+                    </span>
+                  )}
                 </span>
                 <span style={{ width: 70, textAlign: "right", color: "#718096", fontSize: 11 }}>
                   {new Date(log.timestamp).toLocaleTimeString()}
