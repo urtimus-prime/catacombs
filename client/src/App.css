@@ -99,7 +99,8 @@ body::after {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   padding: 20px 20px 15vh;
   position: relative;
   overflow: hidden;
@@ -1097,8 +1098,7 @@ body::after {
 
   /* Connect screen */
   .connect-screen {
-    align-items: flex-end;
-    padding: 20px 20px 10vh;
+    padding: 20px 20px 5vh;
   }
 
   .connect-title {
