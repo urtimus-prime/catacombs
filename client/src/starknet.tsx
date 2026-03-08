@@ -15,6 +15,7 @@ const CHAIN = import.meta.env.VITE_CHAIN ?? "katana";
 
 // --- Katana (local dev) ---
 const KATANA_CHAIN_ID = "0x4b4154414e41";
+const SLOT_CHAIN_ID = "0x57505f43415441434f4d4253";
 
 const katana: Chain = {
   id: BigInt(KATANA_CHAIN_ID),
@@ -63,18 +64,40 @@ function createKatanaBurner(): Connector {
   });
 }
 
-// --- Sepolia (testnet / production) ---
+// --- Slot / Sepolia (production) ---
 function createController(): Connector {
+  const chainId = CHAIN === "slot" ? SLOT_CHAIN_ID : constants.StarknetChainId.SN_SEPOLIA;
   return new ControllerConnector({
     chains: [{ rpcUrl: RPC_URL }],
-    defaultChainId: constants.StarknetChainId.SN_SEPOLIA,
+    defaultChainId: chainId,
   }) as unknown as Connector;
 }
 
 // --- Provider setup ---
-const isTestnet = CHAIN === "sepolia";
-const chain = isTestnet ? sepolia : katana;
-const connectors = [isTestnet ? createController() : createKatanaBurner()];
+const isRemote = CHAIN === "sepolia" || CHAIN === "slot";
+
+const slotChain: Chain = {
+  id: BigInt(SLOT_CHAIN_ID),
+  name: "Slot Katana",
+  network: "slot",
+  testnet: true,
+  nativeCurrency: {
+    address: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+    name: "Stark",
+    symbol: "STRK",
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: { http: [RPC_URL] },
+    public: { http: [RPC_URL] },
+  },
+  paymasterRpcUrls: {
+    avnu: { http: [RPC_URL] },
+  },
+} as Chain;
+
+const chain = CHAIN === "sepolia" ? sepolia : CHAIN === "slot" ? slotChain : katana;
+const connectors = [isRemote ? createController() : createKatanaBurner()];
 const provider = jsonRpcProvider({ rpc: () => ({ nodeUrl: RPC_URL }) });
 
 export default function StarknetProvider({ children }: PropsWithChildren) {
