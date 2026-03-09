@@ -1,8 +1,8 @@
 {
   "world": {
     "class_hash": "0x613551abceb2b37073b1149bb862ea70cf029981ce1ca47e9dd7c7ab97cb65d",
-    "address": "0x6d0cbcf0cfcc7cf77cfe609816dd4818f56027824216ec0d95df4cf456ed00c",
-    "seed": "catacombs",
+    "address": "0x723ebd7b8cf2ee8ce1d4134f8f092390b49b6898789d40b5e6d54c10f5d47ce",
+    "seed": "catacombs_v2",
     "name": "Catacombs",
     "entrypoints": [
       "uuid",
@@ -33,7 +33,7 @@
   },
   "contracts": [
     {
-      "address": "0x7134f3e1da676d12ed437adaef858234a6b82f68663829a044ecaa64a67db47",
+      "address": "0x157bb7ccabb8013af196c9d579817d92bf806b9520817fdd7cd39ef1c7b9946",
       "class_hash": "0x5c2be564478d382e6d3fefdf254d50b99e22a5356bbb291fa05e829a4928721",
       "init_calldata": [],
       "tag": "catacombs-cat_actions",
@@ -45,8 +45,8 @@
       ]
     },
     {
-      "address": "0x37c91310a40afdbd507bdca46a5b6fb52431f7ae19263a0ba3e4ae7d300f3f3",
-      "class_hash": "0x717aabd1effe23a1ccb5cbead99d1eeaa78098d3086ccec43d1d8daf5b9b212",
+      "address": "0x7b120af196fbfa89e9688aeaf4015337eb4497b930423ae4c42a4468cb55ed",
+      "class_hash": "0x72f2588c3048027050cd29a3b43dbbc4544d5c17fc2e928d05654589605d4f9",
       "init_calldata": [],
       "tag": "catacombs-encounter_actions",
       "selector": "0x50299985dc3cf5ad703991a352beba956b89baef8df5d52ba99f0be4a08a6f9",
@@ -57,8 +57,8 @@
       ]
     },
     {
-      "address": "0x7f02c2155949ed1a1fb6a81bbc4fd6afa94680802328c4cc09e97651fdb9d73",
-      "class_hash": "0xa7003e7de66f8a7d26b7ff21acea278debb24e3a3b446f8915e2f07e072d0a",
+      "address": "0x1a13f5cb57f2cd5b8cc042936544c0c8dd0b945cb82aa0e103defa2f3b5f53e",
+      "class_hash": "0x1fa27e2eded6d68d983a5fed3c8ecf192b5eb3848b6506734d2cf0668fd29e8",
       "init_calldata": [],
       "tag": "catacombs-run_actions",
       "selector": "0xcf6b86b41041b5861f8891fa8034501cf0d41d779f0d7513777f3408b5331f",
@@ -70,7 +70,7 @@
       ]
     },
     {
-      "address": "0x7fe2d396cae5305d36ac124f81eb22eaf2a464b3aad9d02557b1eb0d59289b4",
+      "address": "0x7e4b4f6d06a44f69109c813bf831e435ae9695f80fce51d886bc3150b21d671",
       "class_hash": "0x7a31e538a7c8f8cc665307ec243430298f7c8744cd6aae88da50bb226d76bdb",
       "init_calldata": [],
       "tag": "catacombs-shiny_actions",
@@ -313,7 +313,12 @@
           "key": true
         },
         {
-          "name": "floor",
+          "name": "column",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "row",
           "type": "core::integer::u8",
           "key": false
         },
@@ -333,12 +338,27 @@
           "key": false
         },
         {
+          "name": "skill_tag_1",
+          "type": "core::felt252",
+          "key": false
+        },
+        {
+          "name": "skill_tag_2",
+          "type": "core::felt252",
+          "key": false
+        },
+        {
+          "name": "difficulty",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
           "name": "connections",
           "type": "core::integer::u32",
           "key": false
         }
       ],
-      "class_hash": "0x4e9211c47407be45ca1662d5509cd233bc043149de8d7d4b7ed00ed3d103013",
+      "class_hash": "0x388716d7c0dea4c9b73399aa08ae1ae2065bd6d7fae1977f9b3824a821f8bda",
       "tag": "catacombs-Node",
       "selector": "0x639a0f3f558831f5f60b414bdd4a9a7514031322f9d199e766669c4f5929622"
     },
@@ -382,12 +402,7 @@
           "key": false
         },
         {
-          "name": "floor",
-          "type": "core::integer::u8",
-          "key": false
-        },
-        {
-          "name": "max_floors",
+          "name": "node_count",
           "type": "core::integer::u8",
           "key": false
         },
@@ -407,7 +422,7 @@
           "key": false
         }
       ],
-      "class_hash": "0x9828a44de3aead22585fe52bcefa3d49b37767e789a9fb39e0c78d75b1489",
+      "class_hash": "0x61bfc1c681e664b693e86594835baedbea5cb014bfa4ccd9cb8204237269eaf",
       "tag": "catacombs-Run",
       "selector": "0x5a3b0e74ddf2b3bb2094bf79d7f5252b8c48da168255e0e59cacb4686fdbc36"
     },
@@ -612,7 +627,7 @@
           "key": false
         }
       ],
-      "class_hash": "0x3a60627dedda28d3efd54f22b2ab4675629805396520179cb8aa0521f35f54a",
+      "class_hash": "0x6a5a985bdc867ed397759c200d533229be9e0b2e2af47066d90a1f938d4aa1b",
       "tag": "catacombs-NodeVisited",
       "selector": "0x3e0a2d3077ae8ce1442720edbfa671e3af69a4c4406fade510de7513aaafbcc"
     },
@@ -1497,7 +1512,11 @@
           "type": "core::integer::u8"
         },
         {
-          "name": "floor",
+          "name": "column",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "row",
           "type": "core::integer::u8"
         },
         {
@@ -1511,6 +1530,18 @@
         {
           "name": "outcome_seed",
           "type": "core::felt252"
+        },
+        {
+          "name": "skill_tag_1",
+          "type": "core::felt252"
+        },
+        {
+          "name": "skill_tag_2",
+          "type": "core::felt252"
+        },
+        {
+          "name": "difficulty",
+          "type": "core::integer::u8"
         },
         {
           "name": "connections",
@@ -1543,10 +1574,6 @@
           "type": "()"
         },
         {
-          "name": "Shop",
-          "type": "()"
-        },
-        {
           "name": "Boss",
           "type": "()"
         }
@@ -1557,7 +1584,11 @@
       "name": "catacombs::models::node::NodeValue",
       "members": [
         {
-          "name": "floor",
+          "name": "column",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "row",
           "type": "core::integer::u8"
         },
         {
@@ -1571,6 +1602,18 @@
         {
           "name": "outcome_seed",
           "type": "core::felt252"
+        },
+        {
+          "name": "skill_tag_1",
+          "type": "core::felt252"
+        },
+        {
+          "name": "skill_tag_2",
+          "type": "core::felt252"
+        },
+        {
+          "name": "difficulty",
+          "type": "core::integer::u8"
         },
         {
           "name": "connections",
@@ -1681,11 +1724,7 @@
           "type": "core::integer::u8"
         },
         {
-          "name": "floor",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "max_floors",
+          "name": "node_count",
           "type": "core::integer::u8"
         },
         {
@@ -1833,11 +1872,7 @@
           "type": "core::integer::u8"
         },
         {
-          "name": "floor",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "max_floors",
+          "name": "node_count",
           "type": "core::integer::u8"
         },
         {

@@ -30,7 +30,7 @@
 
 ## Worlds
 - Free (Slot Katana): `0x06d0cbcf0cfcc7cf77cfe609816dd4818f56027824216ec0d95df4cf456ed00c`
-- Staging (Sepolia): `0x06d0cbcf0cfcc7cf77cfe609816dd4818f56027824216ec0d95df4cf456ed00c`
+- Staging (Sepolia): `0x0723ebd7b8cf2ee8ce1d4134f8f092390b49b6898789d40b5e6d54c10f5d47ce`
 - Deployer account (Sepolia): `0x07b74a0227981b8ea8d12bb16276be9f23b3d4d58a5957be6b60688c686e19e3` (keys in `.env`)
 
 ## Cloudflare
