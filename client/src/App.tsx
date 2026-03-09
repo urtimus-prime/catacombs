@@ -645,7 +645,9 @@ function App() {
   const catScene = connected
     ? (defeat ? "cozy_fireplace" : getCatScene(currentNodeType))
     : "default_studio";
-  const viewerSlotClass = connected ? `cat-viewer-slot slot-${tab}` : "cat-viewer-slot slot-connect";
+  const viewerSlotClass = connected
+    ? `cat-viewer-slot slot-${tab}${tab === "cats" && creating ? " slot-creating" : ""}`
+    : "cat-viewer-slot slot-connect";
 
   // Show the cat's on-chain appearance in the viewer (creator overrides when active)
   // On Catacombs tab, show the running cat; on Cats tab, show the selected/browsed cat
@@ -1221,62 +1223,73 @@ function CatCreator({ appearance, onChange, onConfirm, onCancel, pending }: {
   };
 
   return (
-    <div className="card">
-      <h3 className="card-title">Create Your Cat</h3>
-
-      <div className="creator-section">
-        <label className="creator-label">Fur Color</label>
-        <input type="color" className="creator-color"
-          value={rgbToHex(appearance.primaryR, appearance.primaryG, appearance.primaryB)}
-          onChange={e => setColor("primary", e.target.value)} />
-      </div>
-
-      <div className="creator-section">
-        <label className="creator-label">Stripe Color</label>
-        <input type="color" className="creator-color"
-          value={rgbToHex(appearance.stripeR, appearance.stripeG, appearance.stripeB)}
-          onChange={e => setColor("stripe", e.target.value)} />
-      </div>
-
-      <div className="creator-section">
-        <label className="creator-label">Eye Color</label>
-        <input type="color" className="creator-color"
-          value={rgbToHex(appearance.eyeR, appearance.eyeG, appearance.eyeB)}
-          onChange={e => setColor("eye", e.target.value)} />
-      </div>
-
-      <div className="creator-section">
-        <label className="creator-label">Head Size</label>
-        <input type="range" className="creator-slider" min={0} max={15} step={1}
-          value={appearance.headSize} onChange={e => set("headSize", +e.target.value)} />
-      </div>
-
-      <div className="creator-section">
-        <label className="creator-label">Eye Size</label>
-        <input type="range" className="creator-slider" min={0} max={15} step={1}
-          value={appearance.eyeSize} onChange={e => set("eyeSize", +e.target.value)} />
-      </div>
-
-      <div className="creator-section">
-        <label className="creator-label">Body Width</label>
-        <input type="range" className="creator-slider" min={0} max={15} step={1}
-          value={appearance.bodyWidth} onChange={e => set("bodyWidth", +e.target.value)} />
-      </div>
-
-      <div className="creator-section">
-        <label className="creator-label">Tail Size</label>
-        <input type="range" className="creator-slider" min={0} max={15} step={1}
-          value={appearance.tailSize} onChange={e => set("tailSize", +e.target.value)} />
-      </div>
-
-      <div className="creator-buttons">
-        <button className="btn btn-secondary" onClick={() => onChange(randomAppearance())} disabled={pending}>
-          Randomize
+    <div className="card creator-card">
+      <div className="creator-top-row">
+        <h3 className="card-title" style={{ margin: 0 }}>Create Your Cat</h3>
+        <button className="btn-icon btn-randomize" onClick={() => onChange(randomAppearance())} disabled={pending} title="Randomize">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="3" />
+            <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="16" cy="8" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="8" cy="16" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+          </svg>
         </button>
-        <button className="btn btn-primary" onClick={onConfirm} disabled={pending}>
+      </div>
+
+      {/* Colors row */}
+      <div className="creator-colors">
+        <label className="creator-color-group">
+          <span className="creator-color-label">Fur</span>
+          <input type="color" className="creator-color"
+            value={rgbToHex(appearance.primaryR, appearance.primaryG, appearance.primaryB)}
+            onChange={e => setColor("primary", e.target.value)} />
+        </label>
+        <label className="creator-color-group">
+          <span className="creator-color-label">Stripe</span>
+          <input type="color" className="creator-color"
+            value={rgbToHex(appearance.stripeR, appearance.stripeG, appearance.stripeB)}
+            onChange={e => setColor("stripe", e.target.value)} />
+        </label>
+        <label className="creator-color-group">
+          <span className="creator-color-label">Eyes</span>
+          <input type="color" className="creator-color"
+            value={rgbToHex(appearance.eyeR, appearance.eyeG, appearance.eyeB)}
+            onChange={e => setColor("eye", e.target.value)} />
+        </label>
+      </div>
+
+      {/* Sliders grid */}
+      <div className="creator-sliders">
+        <div className="creator-slider-row">
+          <label className="creator-slider-label">Head</label>
+          <input type="range" className="creator-slider" min={0} max={15} step={1}
+            value={appearance.headSize} onChange={e => set("headSize", +e.target.value)} />
+        </div>
+        <div className="creator-slider-row">
+          <label className="creator-slider-label">Eyes</label>
+          <input type="range" className="creator-slider" min={0} max={15} step={1}
+            value={appearance.eyeSize} onChange={e => set("eyeSize", +e.target.value)} />
+        </div>
+        <div className="creator-slider-row">
+          <label className="creator-slider-label">Body</label>
+          <input type="range" className="creator-slider" min={0} max={15} step={1}
+            value={appearance.bodyWidth} onChange={e => set("bodyWidth", +e.target.value)} />
+        </div>
+        <div className="creator-slider-row">
+          <label className="creator-slider-label">Tail</label>
+          <input type="range" className="creator-slider" min={0} max={15} step={1}
+            value={appearance.tailSize} onChange={e => set("tailSize", +e.target.value)} />
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="creator-actions">
+        <button className="btn btn-primary creator-summon" onClick={onConfirm} disabled={pending}>
           {pending ? "Creating..." : "Summon Cat"}
         </button>
-        <button className="btn btn-danger" onClick={onCancel} disabled={pending}>
+        <button className="btn btn-danger creator-cancel" onClick={onCancel} disabled={pending}>
           Cancel
         </button>
       </div>

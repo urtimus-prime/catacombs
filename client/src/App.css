@@ -295,6 +295,12 @@ body::after {
   max-height: 480px;
 }
 
+/* Cats tab during creation: shorter viewer to fit controls */
+.cat-viewer-slot.slot-creating iframe {
+  aspect-ratio: 16 / 9;
+  max-height: 320px;
+}
+
 /* Catacombs tab: compact viewer */
 .cat-viewer-slot.slot-catacombs iframe {
   aspect-ratio: 16 / 10;
@@ -1029,50 +1035,122 @@ body::after {
 
 /* ===== CAT CREATOR ===== */
 
-.creator-section {
+.creator-card {
+  padding: 14px 16px 16px;
+}
+
+.creator-top-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--stone-800);
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
-.creator-section:last-of-type {
-  border-bottom: none;
-}
-
-.creator-label {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--stone-800);
+  border: 1px solid var(--stone-600);
   color: var(--stone-400);
-  min-width: 80px;
-  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.btn-icon:hover {
+  color: var(--amber-400);
+  border-color: var(--amber-600);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-randomize:active:not(:disabled) {
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+/* Colors row — 3 swatches inline */
+.creator-colors {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.creator-color-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.creator-color-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--stone-500);
 }
 
 .creator-color {
-  width: 40px;
-  height: 28px;
+  width: 28px;
+  height: 22px;
   border: 1px solid var(--stone-600);
   background: var(--stone-800);
   cursor: pointer;
   padding: 0;
   -webkit-appearance: none;
   appearance: none;
+  transition: border-color 0.15s ease;
+}
+
+.creator-color:hover {
+  border-color: var(--stone-400);
 }
 
 .creator-color::-webkit-color-swatch-wrapper {
-  padding: 2px;
+  padding: 1px;
 }
 
 .creator-color::-webkit-color-swatch {
   border: none;
 }
 
+/* Sliders — 2-column grid */
+.creator-sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+  margin-bottom: 14px;
+}
+
+.creator-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.creator-slider-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--stone-500);
+  min-width: 32px;
+  flex-shrink: 0;
+}
+
 .creator-slider {
   flex: 1;
-  height: 4px;
+  height: 3px;
   -webkit-appearance: none;
   appearance: none;
   background: var(--stone-700);
@@ -1082,8 +1160,8 @@ body::after {
 
 .creator-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--amber-400);
   border: 2px solid var(--stone-900);
@@ -1091,38 +1169,25 @@ body::after {
 }
 
 .creator-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--amber-400);
   border: 2px solid var(--stone-900);
   cursor: pointer;
 }
 
-.creator-select {
-  flex: 1;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--stone-200);
-  background: var(--stone-800);
-  border: 1px solid var(--stone-600);
-  padding: 6px 10px;
-  cursor: pointer;
-  text-transform: capitalize;
-}
-
-.creator-select:focus {
-  outline: 1px solid var(--amber-600);
-  border-color: var(--amber-600);
-}
-
-.creator-buttons {
+/* Action buttons */
+.creator-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 20px;
+  gap: 8px;
 }
 
-.creator-buttons .btn {
+.creator-summon {
+  flex: 2;
+}
+
+.creator-cancel {
   flex: 1;
 }
 
@@ -1272,6 +1337,11 @@ body::after {
     max-height: 320px;
   }
 
+  .cat-viewer-slot.slot-creating iframe {
+    aspect-ratio: 16 / 9;
+    max-height: 220px;
+  }
+
   .cat-viewer-slot.slot-catacombs iframe {
     max-height: 200px;
   }
@@ -1388,6 +1458,19 @@ body::after {
     font-size: 11px;
     padding: 10px 20px;
     width: 100%;
+  }
+
+  /* Creator — keep 2-col on mobile, just tighten */
+  .creator-card {
+    padding: 10px 12px 14px;
+  }
+
+  .creator-sliders {
+    gap: 4px 10px;
+  }
+
+  .creator-actions .btn {
+    padding: 10px 12px;
   }
 
   /* Toasts */
