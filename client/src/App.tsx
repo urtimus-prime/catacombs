@@ -662,14 +662,15 @@ function App() {
   const connected = !!address;
   const currentNode = nodes.find(n => n.node_id === run?.current_node_id);
   const currentNodeType = currentNode ? NODE_TYPES[currentNode.node_type] : undefined;
+  const currentSkillTag = currentNode?.skill_tag_1 || undefined;
   const catAnimation = connected
     ? (tab === "cats"
       ? (selectedWeapon !== "none" ? "Sword_Idle" : catIdleAnim)
       : defeat ? (defeat.status === "Completed" ? VICTORY_ANIM : DEFEAT_ANIM)
-      : getCatAnimation(run, currentNodeType, pending))
+      : getCatAnimation(run, currentNodeType, currentSkillTag, pending))
     : connectDance;
   const catScene = connected
-    ? (defeat ? "cozy_fireplace" : getCatScene(currentNodeType))
+    ? (defeat ? "cozy_fireplace" : getCatScene(currentNodeType, currentSkillTag))
     : "default_studio";
   const viewerSlotClass = connected
     ? `cat-viewer-slot slot-${tab}`
@@ -1143,23 +1144,39 @@ function RunHistory({ entries, explorerUrl }: { entries: RunLogEntry[]; explorer
 }
 
 // Animation mapping: node type -> cat animation
-const NODE_ANIM: Record<string, string> = {
-  Start: "Idle_Dreamer",
-  Combat: "Sword_Attack_Light",
-  Treasure: "Cat_Robot_Hip_Hop_Dance",
-  Rest: "Cat_Seated_Idle",
-  Event: "Cat_Looking_Around",
-  Shop: "Cat_Waving",
-  Boss: "Sword_Attack_Medium",
+// Animation per skill tag — used for Event and Combat nodes
+const SKILL_ANIM: Record<string, string> = {
+  combat: "Sword_Attack_Light",
+  stealth: "Cat_Crouched_Walking",
+  charm: "Cat_Blow_A_Kiss",
+  agility: "Cat_Dive_Roll",
+  arcane: "Cat_Praying",
+  survival: "Cat_Digging",
 };
 
-const PENDING_ANIM = "Cat_Walking_Backwards";
+// Scene per skill tag — atmospheric match for each skill type
+const SKILL_SCENE: Record<string, string> = {
+  combat: "neon_city",
+  stealth: "moonlit_garden",
+  charm: "sakura_garden",
+  agility: "default_studio",
+  arcane: "cosmic_void",
+  survival: "winter_wonderland",
+};
+
+// Pending animation per node type
+const PENDING_NODE_ANIM: Record<string, string> = {
+  Combat: "Sword_Idle",
+  Boss: "Sword_Idle",
+};
+
 const DEFEAT_ANIM = "Sword_Death";
 const VICTORY_ANIM = "Cat_Robot_Hip_Hop_Dance";
 const IDLE_ANIM = "Idle_Dreamer";
+const PENDING_ANIM = "Cat_Looking_Around";
 
 const DANCE_ANIMS = ["Cat_Macarena_Dance", "Cat_Robot_Hip_Hop_Dance", "Cat_Salsa_Dancing"];
-const IDLE_ANIMS = ["Idle_Dreamer", "Idle_Harmonic", "Idle_Invasive", "Cat_Looking_Around", "Cat_Seated_Idle"];
+const IDLE_ANIMS = ["Idle_Dreamer", "Idle_Harmonic", "Idle_Invasive", "Idle_Whimsical", "Cat_Seated_Idle"];
 
 function pickRandom<T>(arr: T[], exclude?: T): T {
   const filtered = exclude ? arr.filter(a => a !== exclude) : arr;
@@ -1169,20 +1186,35 @@ function pickRandom<T>(arr: T[], exclude?: T): T {
 function getCatAnimation(
   run: RunState | null,
   currentNodeType: string | undefined,
+  skillTag: string | undefined,
   pending: boolean,
 ): string {
-  if (pending) return PENDING_ANIM;
   if (!run || run.status !== 0) return IDLE_ANIM;
-  if (currentNodeType) return NODE_ANIM[currentNodeType] ?? IDLE_ANIM;
-  return IDLE_ANIM;
+  if (pending) return PENDING_NODE_ANIM[currentNodeType ?? ""] ?? PENDING_ANIM;
+  if (!currentNodeType) return IDLE_ANIM;
+
+  switch (currentNodeType) {
+    case "Start": return IDLE_ANIM;
+    case "Treasure": return "Cat_Picking_Up";
+    case "Rest": return "Cat_Seated_Idle";
+    case "Boss": return "Sword_Attack_Hight";
+    case "Shop": return "Cat_Waving";
+    case "Combat":
+    case "Event":
+      return (skillTag && SKILL_ANIM[skillTag]) ?? "Cat_Looking_Around";
+    default: return IDLE_ANIM;
+  }
 }
 
-function getCatScene(currentNodeType: string | undefined): string {
+function getCatScene(currentNodeType: string | undefined, skillTag: string | undefined): string {
+  // Skill-specific scenes for event/combat nodes
+  if ((currentNodeType === "Event" || currentNodeType === "Combat") && skillTag && SKILL_SCENE[skillTag]) {
+    return SKILL_SCENE[skillTag];
+  }
   switch (currentNodeType) {
-    case "Combat": case "Boss": return "neon_city";
+    case "Boss": return "neon_city";
     case "Treasure": return "cozy_fireplace";
     case "Rest": return "moonlit_garden";
-    case "Event": return "sakura_garden";
     case "Shop": return "winter_wonderland";
     default: return "default_studio";
   }
