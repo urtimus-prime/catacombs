@@ -665,7 +665,7 @@ function App() {
   const currentSkillTag = currentNode?.skill_tag_1 || undefined;
   const catAnimation = connected
     ? (tab === "cats"
-      ? (selectedWeapon !== "none" ? "Sword_Idle" : catIdleAnim)
+      ? (selectedWeapon === "gun" ? "Pistol_Attack_End" : selectedWeapon !== "none" ? "Sword_Idle" : catIdleAnim)
       : defeat ? (defeat.status === "Completed" ? VICTORY_ANIM : DEFEAT_ANIM)
       : getCatAnimation(run, currentNodeType, currentSkillTag, pending))
     : connectDance;
