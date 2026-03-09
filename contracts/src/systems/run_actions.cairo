@@ -125,8 +125,8 @@ pub mod run_actions {
         fn node_id_for(col: u8, row: u8) -> u8 {
             if col == 0 {
                 0
-            } else if col == 9 {
-                25
+            } else if col == 7 {
+                19
             } else {
                 (col - 1) * 3 + 1 + row
             }
@@ -139,14 +139,14 @@ pub mod run_actions {
         fn generate_map(ref world: dojo::world::WorldStorage, run_id: u64, seed: felt252) -> u8 {
             let mut rng = RandomTrait::new_deterministic(seed);
 
-            // Phase 1: Column widths
-            let pinch_col: u8 = rng.between(3_u8, 6_u8);
+            // Phase 1: Column widths (8 columns: 0=Start, 1-6=middle, 7=Boss)
+            let pinch_col: u8 = rng.between(2_u8, 5_u8);
 
             let mut widths: Felt252Dict<u8> = Default::default();
             widths.insert(Self::u8_to_felt(0), 1);
             let mut c: u8 = 1;
             loop {
-                if c > 8 {
+                if c > 6 {
                     break;
                 }
                 if c == pinch_col {
@@ -157,7 +157,7 @@ pub mod run_actions {
                 }
                 c += 1;
             };
-            widths.insert(Self::u8_to_felt(9), 1);
+            widths.insert(Self::u8_to_felt(7), 1);
 
             // Phase 2: Build connections
             let mut connections: Felt252Dict<u32> = Default::default();
@@ -165,7 +165,7 @@ pub mod run_actions {
 
             let mut c: u8 = 0;
             loop {
-                if c > 8 {
+                if c > 6 {
                     break;
                 }
                 let cur_width: u8 = widths.get(Self::u8_to_felt(c));
@@ -241,7 +241,7 @@ pub mod run_actions {
             // Phase 3: Node types
             let mut node_types: Felt252Dict<u8> = Default::default();
             node_types.insert(0, 0); // Start
-            node_types.insert(25, 5); // Boss
+            node_types.insert(19, 5); // Boss
 
             let mut has_treasure: bool = false;
             let mut has_rest: bool = false;
@@ -250,7 +250,7 @@ pub mod run_actions {
 
             let mut c: u8 = 1;
             loop {
-                if c > 8 {
+                if c > 6 {
                     break;
                 }
                 let w: u8 = widths.get(Self::u8_to_felt(c));
@@ -295,7 +295,7 @@ pub mod run_actions {
                     let mut found: bool = false;
                     let mut cc: u8 = 1;
                     loop {
-                        if cc > 8 || found {
+                        if cc > 6 || found {
                             break;
                         }
                         let ww: u8 = widths.get(Self::u8_to_felt(cc));
@@ -340,7 +340,7 @@ pub mod run_actions {
             // Middle nodes
             let mut c: u8 = 1;
             loop {
-                if c > 8 {
+                if c > 6 {
                     break;
                 }
                 let w: u8 = widths.get(Self::u8_to_felt(c));
@@ -359,7 +359,7 @@ pub mod run_actions {
                     let difficulty: u8 = if is_passive {
                         0
                     } else {
-                        let base: u8 = (c - 1) / 3 + 1;
+                        let base: u8 = (c - 1) / 2 + 1;
                         let max_diff: u8 = if base + 1 > 3 { 3 } else { base + 1 };
                         rng.between(base, max_diff)
                     };
@@ -412,8 +412,8 @@ pub mod run_actions {
             // Boss node
             let boss_node = Node {
                 run_id,
-                node_id: 25,
-                column: 9,
+                node_id: 19,
+                column: 7,
                 row: 0,
                 node_type: NodeType::Boss,
                 resolved: false,

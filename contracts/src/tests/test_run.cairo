@@ -130,7 +130,7 @@ mod tests {
         // Find the lowest set bit
         let mut i: u8 = 0;
         loop {
-            if i >= 26 {
+            if i >= 20 {
                 break 0_u8;
             }
             let mut mask: u32 = 1;
@@ -171,14 +171,14 @@ mod tests {
         assert!(node0.node_type == NodeType::Start, "node 0 should be Start");
         assert!(node0.column == 0, "node 0 should be column 0");
 
-        // Node 25 should be Boss
-        let node25: Node = ctx.world.read_model((run_id, 25_u8));
-        assert!(node25.node_type == NodeType::Boss, "node 25 should be Boss");
-        assert!(node25.column == 9, "node 25 should be column 9");
+        // Node 19 should be Boss
+        let node19: Node = ctx.world.read_model((run_id, 19_u8));
+        assert!(node19.node_type == NodeType::Boss, "node 19 should be Boss");
+        assert!(node19.column == 7, "node 19 should be column 7");
 
-        // node_count should be reasonable (10 cols: 1 + 8*[1-3] + 1 = min 10, max 26)
-        assert!(run.node_count >= 10, "node_count should be at least 10");
-        assert!(run.node_count <= 26, "node_count should be at most 26");
+        // node_count should be reasonable (8 cols: 1 + 6*[1-3] + 1 = min 8, max 20)
+        assert!(run.node_count >= 8, "node_count should be at least 8");
+        assert!(run.node_count <= 20, "node_count should be at most 20");
     }
 
     #[test]
@@ -190,8 +190,8 @@ mod tests {
         assert!(node0.connections != 0, "start should have connections");
 
         // Boss node should have no outgoing connections
-        let node25: Node = ctx.world.read_model((run_id, 25_u8));
-        assert!(node25.connections == 0, "boss should have no outgoing connections");
+        let node19: Node = ctx.world.read_model((run_id, 19_u8));
+        assert!(node19.connections == 0, "boss should have no outgoing connections");
 
         // Every connected node should exist with a valid type
         // Check that we can reach at least one node from start
@@ -237,8 +237,8 @@ mod tests {
     #[should_panic(expected: "no path to that node")]
     fn test_choose_invalid_path_panics() {
         let (ctx, _cat_id, run_id) = setup_with_run();
-        // From start (0), cannot go directly to node 25 (boss)
-        ctx.run_actions.choose_path(run_id, 25);
+        // From start (0), cannot go directly to node 19 (boss)
+        ctx.run_actions.choose_path(run_id, 19);
     }
 
     #[test]
@@ -530,8 +530,8 @@ mod tests {
             current = next;
             steps += 1;
 
-            // Safety: should never take more than 9 steps (cols 1-9)
-            assert!(steps <= 9, "too many steps");
+            // Safety: should never take more than 7 steps (cols 1-7)
+            assert!(steps <= 7, "too many steps");
         };
 
         // Now at boss node, resolve boss encounter

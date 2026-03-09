@@ -14,14 +14,19 @@ const CAT_VIEWER_BASE = import.meta.env.DEV
   : `https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer/${CAT_VIEWER_VERSION}`;
 
 const NODE_ICONS: Record<string, string> = {
-  Start: "\u2302", Combat: "\u2694", Treasure: "\u2666",
-  Rest: "\u2665", Event: "\u2605", Boss: "\u2620",
+  Start: "\u25C9", Treasure: "\u2666", Rest: "\u2665", Boss: "\u2620",
 };
 
-interface TxLog {
+// Skill glyphs — clean text symbols, no emoji variation selectors
+const SKILL_ICONS: Record<string, string> = {
+  combat: "\u2694", stealth: "\u25C8", charm: "\u2661",
+  agility: "\u2192", arcane: "\u2726", survival: "\u2618",
+};
+
+interface Toast {
   id: number;
-  action: string;
-  txHash: string;
+  message: string;
+  type: "success" | "error" | "info";
   timestamp: number;
 }
 
@@ -216,9 +221,7 @@ function App() {
   const [catIdleAnim, setCatIdleAnim] = useState(IDLE_ANIM);
   const [run, setRun] = useState<RunState | null>(null);
   const [nodes, setNodes] = useState<NodeState[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [txLogs, setTxLogs] = useState<TxLog[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const txIdRef = useRef(1);
 
   const selectedEntry = cats.find(e => e.cat.id === selectedCatId);
@@ -306,8 +309,8 @@ function App() {
           // Safest: fetch all possible IDs 0-25
           nodeIds.push(i);
         }
-        // Actually just fetch 0 through 25 and filter out empty ones
-        const allIds = Array.from({ length: 26 }, (_, i) => i);
+        // Fetch all possible node IDs 0 through 19 and filter out empty ones
+        const allIds = Array.from({ length: 20 }, (_, i) => i);
         const nodeResults = await Promise.all(
           allIds.map(id => client.run_actions.get_node(runId, id).catch(() => null))
         );
@@ -329,9 +332,10 @@ function App() {
     } catch { setRun(null); setNodes([]); }
   }, [client]);
 
-  const addTxLog = useCallback((action: string, txHash: string) => {
+  const addToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
     const id = txIdRef.current++;
-    setTxLogs(prev => [{ id, action, txHash, timestamp: Date.now() }, ...prev]);
+    setToasts(prev => [...prev, { id, message, type, timestamp: Date.now() }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   }, []);
 
   // Poll an RPC read until a condition is met (retries up to maxAttempts)
@@ -355,26 +359,24 @@ function App() {
   const wrap = useCallback(
     async (fn: () => Promise<any>, actionName: string, onConfirmed?: () => Promise<void>) => {
       if (!account) return;
-      setError(null);
-      setSuccess(null);
       setPending(true);
       try {
         const result = await fn();
         if (result?.transaction_hash) {
-          addTxLog(actionName, result.transaction_hash);
+          addToast(`${actionName}...`, "info");
           await rpcProvider.waitForTransaction(result.transaction_hash, { retryInterval: 500 });
         }
         if (onConfirmed) {
           await onConfirmed();
         }
-        setSuccess(actionName);
+        addToast(actionName, "success");
       } catch (e: any) {
-        setError(e.message ?? String(e));
+        addToast(e.message?.slice(0, 80) ?? String(e).slice(0, 80), "error");
       } finally {
         setPending(false);
       }
     },
-    [account, addTxLog]
+    [account, addToast]
   );
 
   const createCat = (app: AppearanceData) =>
@@ -440,14 +442,25 @@ function App() {
       },
     );
 
-  const choosePath = (nodeId: number) =>
-    wrap(
+  const choosePath = (nodeId: number) => {
+    // Find the target node to describe what we're heading into
+    const targetNode = nodes.find(n => n.node_id === nodeId);
+    const targetType = targetNode ? NODE_TYPES[targetNode.node_type] : "?";
+    const isSkillCheck = targetType === "Combat" || targetType === "Event";
+    const skillDesc = targetNode?.skill_tag_1
+      ? `${targetNode.skill_tag_1}${targetNode.skill_tag_2 ? ` + ${targetNode.skill_tag_2}` : ""}`
+      : "";
+    const label = isSkillCheck
+      ? `Move \u2192 ${skillDesc} check`
+      : `Move \u2192 ${targetType}`;
+
+    return wrap(
       () => {
         const r = runRef.current;
         if (!r) return Promise.resolve();
         return client.run_actions.choose_path(account!, r.id, nodeId);
       },
-      `Choose Path \u2192 Node ${nodeId}`,
+      label,
       async () => {
         const r = runRef.current;
         if (!r) return;
@@ -462,6 +475,7 @@ function App() {
         await fetchRun(r.id);
       },
     );
+  };
 
   const abandonRun = () =>
     wrap(
@@ -570,9 +584,16 @@ function App() {
         </div>
       )}
 
-      {/* Alerts */}
-      {connected && error && <div className="alert alert-error">{error}</div>}
-      {connected && success && <div className="alert alert-success">{success}</div>}
+      {/* Toasts */}
+      {toasts.length > 0 && (
+        <div className="toast-container">
+          {toasts.map(t => (
+            <div key={t.id} className={`toast toast-${t.type}`}>
+              {t.type === "success" ? "\u2713" : t.type === "error" ? "\u2717" : "\u2022"} {t.message}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ===== CATS TAB ===== */}
       {connected && tab === "cats" && (
@@ -592,7 +613,7 @@ function App() {
             <CatCreator
               appearance={appearance}
               onChange={setAppearance}
-              onConfirm={() => shinies >= 10 ? createCat(appearance) : setError("Need 10 SHINIES to summon a cat. Buy some in the Player tab!")}
+              onConfirm={() => shinies >= 10 ? createCat(appearance) : addToast("Need 10 SHINIES to summon a cat", "error")}
               onCancel={() => setCreating(false)}
               pending={pending}
             />
@@ -673,119 +694,47 @@ function App() {
       {/* ===== CATACOMBS TAB ===== */}
       {connected && tab === "catacombs" && (
         <div className="tab-content">
-          <div className="panels-column">
-              {/* Run Panel */}
-              <div className="card">
-                <h3 className="card-title">Run</h3>
-                {run && run.status === 0 ? (
-                  <>
-                    <div className="stats-grid">
-                      <StatCell label="Run" value={`#${run.id}`} />
-                      <StatCell label="Score" value={run.score} />
-                      <StatCell label="Position" value={
-                        run.current_node_id === 0 ? "Start" :
-                        run.current_node_id === 25 ? "Boss" :
-                        `Node ${run.current_node_id}`
-                      } />
-                      <StatCell label="Visited" value={run.nodes_visited} />
-                      <StatCell label="Score" value={run.score} accent />
-                      <StatCell label="Status" value={RUN_STATUS[run.status]}
-                        hpLevel={1} />
-                    </div>
-                    <div style={{ marginTop: 16 }}>
-                      <button className="btn btn-danger" onClick={abandonRun} disabled={pending}>
-                        Abandon Run
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="empty-state">
-                    <p>
-                      {run ? `Last run: ${RUN_STATUS[run.status]}` : "No active run"}
-                    </p>
-                    {cat ? (
-                      <button className="btn btn-primary" onClick={startRun}
-                        disabled={pending || !cat.alive}>
-                        Begin Descent
-                      </button>
-                    ) : (
-                      <p style={{ fontSize: 12, color: "var(--stone-500)" }}>
-                        Summon a cat first in the Cats tab
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Quick cat stats */}
+          {run && run.status === 0 ? (
+            <>
+              {/* Compact cat stats bar */}
               {cat && (
-                <div className="card">
-                  <h3 className="card-title">Cat #{cat.id}</h3>
-                  <div className="stats-grid">
-                    <StatCell label="HP" value={`${cat.hp}/${cat.max_hp}`}
-                      hpLevel={cat.hp / cat.max_hp} />
-                    <StatCell label="ATK" value={cat.attack} />
-                    <StatCell label="DEF" value={cat.defense} />
-                    <StatCell label="LVL" value={cat.level} accent />
-                  </div>
+                <div className="cat-stats-bar">
+                  <span className="cat-stats-name">Cat #{cat.id}</span>
+                  <span className="cat-stat"><span className="stat-icon hp">{"\u2665"}</span> {cat.hp}/{cat.max_hp}</span>
+                  <span className="cat-stat"><span className="stat-icon atk">{"\u2694"}</span>{cat.attack}</span>
+                  <span className="cat-stat"><span className="stat-icon def">{"\u25C6"}</span>{cat.defense}</span>
+                  <span className="cat-stat"><span className="stat-icon spd">{"\u2192"}</span>{cat.speed}</span>
+                  <span className="cat-stat"><span className="stat-icon lck">{"\u2618"}</span>{cat.luck}</span>
+                  <button className="btn-abandon" onClick={abandonRun} disabled={pending}>Flee</button>
                 </div>
               )}
-          </div>
 
-          {/* Map */}
-          {run && run.status === 0 && (
-            <MapView
-              run={run}
-              nodes={nodes}
-              currentConnections={currentNode?.connections ?? 0}
-              onChoosePath={choosePath}
-              pending={pending}
-            />
-          )}
-
-          {/* Activity Log */}
-          {txLogs.length > 0 && (
+              {/* Map */}
+              <MapView
+                run={run}
+                nodes={nodes}
+                currentConnections={currentNode?.connections ?? 0}
+                onChoosePath={choosePath}
+                pending={pending}
+              />
+            </>
+          ) : (
             <div className="card">
-              <div className="log-header">
-                <h3 className="card-title" style={{ margin: 0 }}>Activity Log</h3>
-                <button className="btn-clear" onClick={() => setTxLogs([])}>Clear</button>
-              </div>
-              <div className="log-table">
-                <div className="log-row log-row-header">
-                  <span>#</span>
-                  <span>Action</span>
-                  <span>Transaction</span>
-                  <span style={{ textAlign: "right" }}>Time</span>
-                </div>
-                {txLogs.map((log) => (
-                  <div key={log.id} className="log-row">
-                    <span className="log-num">{log.id}</span>
-                    <span className="log-action">{log.action}</span>
-                    <span>
-                      {EXPLORER_URL ? (
-                        <a
-                          href={`${EXPLORER_URL}/tx/${log.txHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="log-hash"
-                        >
-                          {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x2197;
-                        </a>
-                      ) : (
-                        <span
-                          className="log-hash"
-                          style={{ cursor: "pointer" }}
-                          onClick={() => navigator.clipboard.writeText(log.txHash)}
-                        >
-                          {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x29C9;
-                        </span>
-                      )}
-                    </span>
-                    <span className="log-time">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))}
+              <h3 className="card-title">Run</h3>
+              <div className="empty-state">
+                <p>
+                  {run ? `Last run: ${RUN_STATUS[run.status]}` : "No active run"}
+                </p>
+                {cat ? (
+                  <button className="btn btn-primary" onClick={startRun}
+                    disabled={pending || !cat.alive}>
+                    Begin Descent
+                  </button>
+                ) : (
+                  <p style={{ fontSize: 12, color: "var(--stone-500)" }}>
+                    Summon a cat first in the Cats tab
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -841,52 +790,6 @@ function App() {
             </div>
           </div>
 
-          {/* Full tx history */}
-          {txLogs.length > 0 && (
-            <div className="card">
-              <div className="log-header">
-                <h3 className="card-title" style={{ margin: 0 }}>Transaction History</h3>
-                <button className="btn-clear" onClick={() => setTxLogs([])}>Clear</button>
-              </div>
-              <div className="log-table">
-                <div className="log-row log-row-header">
-                  <span>#</span>
-                  <span>Action</span>
-                  <span>Transaction</span>
-                  <span style={{ textAlign: "right" }}>Time</span>
-                </div>
-                {txLogs.map((log) => (
-                  <div key={log.id} className="log-row">
-                    <span className="log-num">{log.id}</span>
-                    <span className="log-action">{log.action}</span>
-                    <span>
-                      {EXPLORER_URL ? (
-                        <a
-                          href={`${EXPLORER_URL}/tx/${log.txHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="log-hash"
-                        >
-                          {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x2197;
-                        </a>
-                      ) : (
-                        <span
-                          className="log-hash"
-                          style={{ cursor: "pointer" }}
-                          onClick={() => navigator.clipboard.writeText(log.txHash)}
-                        >
-                          {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)} &#x29C9;
-                        </span>
-                      )}
-                    </span>
-                    <span className="log-time">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -1160,7 +1063,8 @@ function CatCreator({ appearance, onChange, onConfirm, onCancel, pending }: {
   );
 }
 
-const DIFFICULTY_PIPS = ["", "\u2620", "\u2620\u2620", "\u2620\u2620\u2620"];
+// Difficulty shown as dots: · ·· ···
+const DIFF_DOTS = ["", "\u00B7", "\u00B7\u00B7", "\u00B7\u00B7\u00B7"];
 
 function MapView({
   run, nodes, currentConnections, onChoosePath, pending,
@@ -1171,23 +1075,17 @@ function MapView({
   onChoosePath: (nodeId: number) => void;
   pending: boolean;
 }) {
-  // Group nodes by column
+  // Group nodes by column (8 columns: 0-7)
   const columns: NodeState[][] = [];
-  for (let col = 0; col <= 9; col++) {
+  for (let col = 0; col <= 7; col++) {
     const colNodes = nodes
       .filter(n => n.column === col)
       .sort((a, b) => a.row - b.row);
     if (colNodes.length > 0) columns.push(colNodes);
   }
 
-  // Build set of visited node IDs (resolved or current)
-  const visitedIds = new Set(
-    nodes.filter(n => n.resolved).map(n => n.node_id)
-  );
-  visitedIds.add(run.current_node_id);
-
   return (
-    <div className="card">
+    <div className="card map-card">
       <div className="map-header">
         <h3 className="card-title" style={{ margin: 0 }}>Dungeon Map</h3>
         <span className="map-score">Score: {run.score}</span>
@@ -1200,6 +1098,7 @@ function MapView({
               const isReachable = hasConnection(currentConnections, node.node_id);
               const isVisited = node.resolved;
               const typeName = NODE_TYPES[node.node_type] ?? "?";
+              const isSkillCheck = typeName === "Combat" || typeName === "Event";
 
               const classes = [
                 "node-btn",
@@ -1210,21 +1109,29 @@ function MapView({
                 !isCurrent && !isReachable && !isVisited ? "dimmed" : "",
               ].filter(Boolean).join(" ");
 
+              // Skill-check nodes: show skill icon(s) as main content
+              // Treasure/Rest/Start/Boss: show their dedicated icon + label
+              const skillIcon1 = node.skill_tag_1 ? (SKILL_ICONS[node.skill_tag_1] ?? "") : "";
+              const skillIcon2 = node.skill_tag_2 ? (SKILL_ICONS[node.skill_tag_2] ?? "") : "";
+
               return (
                 <button
                   key={node.node_id}
                   className={classes}
                   onClick={() => onChoosePath(node.node_id)}
                   disabled={pending || !isReachable}
-                  title={node.skill_tag_1 ? `${node.skill_tag_1}${node.skill_tag_2 ? ` + ${node.skill_tag_2}` : ""}` : ""}
+                  title={node.skill_tag_1 ? `${node.skill_tag_1}${node.skill_tag_2 ? ` + ${node.skill_tag_2}` : ""}` : typeName}
                 >
-                  <span className="node-icon">{NODE_ICONS[typeName] ?? "?"}</span>
-                  <span className="node-type">{typeName}</span>
-                  {node.difficulty > 0 && (
-                    <span className="node-difficulty">{DIFFICULTY_PIPS[node.difficulty]}</span>
-                  )}
-                  {node.skill_tag_1 && (
-                    <span className="node-skills">{node.skill_tag_1}{node.skill_tag_2 ? ` ${node.skill_tag_2}` : ""}</span>
+                  {isSkillCheck ? (
+                    <>
+                      <span className="node-skill">{skillIcon1}{skillIcon2 ? ` ${skillIcon2}` : ""}</span>
+                      {node.difficulty > 0 && <span className="node-diff">{DIFF_DOTS[node.difficulty]}</span>}
+                    </>
+                  ) : (
+                    <>
+                      <span className="node-icon">{NODE_ICONS[typeName] ?? "?"}</span>
+                      <span className="node-type">{typeName}</span>
+                    </>
                   )}
                 </button>
               );

@@ -481,38 +481,129 @@ body::after {
 
 /* ===== ALERTS ===== */
 
-.alert {
+/* ===== TOASTS ===== */
+
+.toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
   padding: 10px 16px;
-  margin-bottom: 16px;
-  font-size: 13px;
+  font-size: 12px;
+  font-family: var(--font-mono);
   border-left: 3px solid;
-  animation: alert-in 0.3s ease;
+  background: var(--stone-900);
+  animation: toast-in 0.3s ease, toast-out 0.3s ease 3.5s forwards;
+  max-width: 320px;
+  pointer-events: auto;
 }
 
-@keyframes alert-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
-.alert-error {
-  background: rgba(220, 38, 38, 0.08);
-  border-color: var(--blood-600);
-  color: var(--blood-400);
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(20px); }
 }
 
-.alert-success {
-  background: rgba(34, 197, 94, 0.06);
+.toast-success {
   border-color: var(--venom-500);
   color: var(--venom-400);
 }
 
+.toast-error {
+  border-color: var(--blood-500);
+  color: var(--blood-400);
+}
+
+.toast-info {
+  border-color: var(--frost-500);
+  color: var(--frost-400);
+}
+
+/* ===== CAT STATS BAR ===== */
+
+.cat-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--stone-900);
+  border: 1px solid var(--stone-700);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.cat-stats-name {
+  font-weight: 600;
+  color: var(--amber-400);
+  margin-right: 4px;
+}
+
+.cat-stat {
+  color: var(--stone-300);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.stat-icon.hp { color: var(--blood-400); }
+.stat-icon.atk { color: var(--amber-400); }
+.stat-icon.def { color: var(--frost-400); }
+.stat-icon.spd { color: var(--venom-400); }
+.stat-icon.lck { color: var(--arcane-400); }
+
+.btn-abandon {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  border: 1px solid var(--blood-600);
+  color: var(--blood-400);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-abandon:hover {
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.btn-abandon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ===== MAP ===== */
+
+.map-card {
+  padding: 16px;
+}
 
 .map-header {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .map-score {
@@ -525,66 +616,66 @@ body::after {
 
 .map-container {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: center;
-  padding: 16px 4px;
-  gap: 4px;
+  padding: 8px 0;
+  gap: 3px;
   position: relative;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .map-column {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .node-btn {
-  width: 72px;
-  height: 56px;
+  width: 100%;
+  max-width: 88px;
+  aspect-ratio: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
   cursor: default;
   transition: all 0.2s ease;
   border: 2px solid var(--stone-700);
   background: var(--stone-800);
   position: relative;
   font-family: var(--font-mono);
+  padding: 2px;
 }
 
+/* Labeled nodes (Start, Treasure, Rest, Boss) */
 .node-btn .node-type {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .node-btn .node-icon {
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
 }
 
-.node-btn .node-difficulty {
-  font-size: 7px;
+/* Skill-check nodes (Combat, Event) — show skill glyph prominently */
+.node-btn .node-skill {
+  font-size: 18px;
   line-height: 1;
-  color: var(--blood-400);
-  letter-spacing: -1px;
+  letter-spacing: 2px;
 }
 
-.node-btn .node-skills {
-  font-size: 7px;
+.node-btn .node-diff {
+  font-size: 12px;
+  line-height: 1;
   color: var(--stone-400);
-  text-transform: lowercase;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: 2px;
+  font-weight: 700;
 }
 
 /* Node states */
@@ -616,21 +707,25 @@ body::after {
 /* Node type colors */
 .node-btn.type-Start { background: var(--stone-800); }
 .node-btn.type-Start .node-type { color: var(--stone-300); }
+.node-btn.type-Start .node-icon { color: var(--stone-300); }
 
-.node-btn.type-Combat { background: rgba(220, 38, 38, 0.1); }
-.node-btn.type-Combat .node-type { color: var(--blood-400); }
+.node-btn.type-Combat { background: rgba(220, 38, 38, 0.08); }
+.node-btn.type-Combat .node-skill { color: var(--blood-400); }
 
 .node-btn.type-Treasure { background: rgba(245, 158, 11, 0.08); }
 .node-btn.type-Treasure .node-type { color: var(--amber-400); }
+.node-btn.type-Treasure .node-icon { color: var(--amber-400); }
 
 .node-btn.type-Rest { background: rgba(34, 197, 94, 0.08); }
 .node-btn.type-Rest .node-type { color: var(--venom-400); }
+.node-btn.type-Rest .node-icon { color: var(--venom-400); }
 
 .node-btn.type-Event { background: rgba(139, 92, 246, 0.08); }
-.node-btn.type-Event .node-type { color: var(--arcane-400); }
+.node-btn.type-Event .node-skill { color: var(--arcane-400); }
 
 .node-btn.type-Boss { background: rgba(220, 38, 38, 0.15); }
 .node-btn.type-Boss .node-type { color: var(--blood-400); }
+.node-btn.type-Boss .node-icon { color: var(--blood-400); }
 
 .map-hint {
   text-align: center;
@@ -1206,19 +1301,25 @@ body::after {
   }
 
   /* Map */
+  .map-card {
+    padding: 10px;
+  }
+
   .map-container {
-    padding: 8px 0;
+    padding: 4px 0;
+    gap: 2px;
+  }
+
+  .map-column {
     gap: 2px;
   }
 
   .node-btn {
-    width: 48px;
-    height: 40px;
     border-width: 1.5px;
   }
 
   .node-btn .node-icon {
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .node-btn .node-type {
@@ -1226,12 +1327,19 @@ body::after {
     letter-spacing: 0;
   }
 
-  .node-btn .node-difficulty {
-    font-size: 6px;
+  .node-btn .node-skill {
+    font-size: 14px;
+    letter-spacing: 1px;
   }
 
-  .node-btn .node-skills {
-    display: none;
+  .node-btn .node-diff {
+    font-size: 10px;
+  }
+
+  .cat-stats-bar {
+    gap: 8px;
+    font-size: 11px;
+    padding: 6px 10px;
   }
 
   .map-hint {
@@ -1272,12 +1380,15 @@ body::after {
     width: 100%;
   }
 
-  /* Alerts */
-  .alert {
-    font-size: 12px;
-    padding: 8px 12px;
-    margin-bottom: 12px;
-    word-break: break-word;
+  /* Toasts */
+  .toast-container {
+    top: 8px;
+    right: 8px;
+  }
+
+  .toast {
+    font-size: 11px;
+    max-width: 260px;
   }
 
   /* Pending indicator - above tab bar on mobile */
@@ -1313,16 +1424,15 @@ body::after {
     font-size: 28px;
   }
 
-  .node-btn {
-    width: 48px;
-    height: 42px;
-  }
-
   .node-btn .node-type {
-    font-size: 7px;
+    font-size: 6px;
   }
 
   .node-btn .node-icon {
+    font-size: 11px;
+  }
+
+  .node-btn .node-skill {
     font-size: 12px;
   }
 
