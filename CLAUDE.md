@@ -36,14 +36,36 @@
 - Deployer account (Sepolia): `0x07b74a0227981b8ea8d12bb16276be9f23b3d4d58a5957be6b60688c686e19e3` (keys in `.env`)
 
 ## EGS (Embeddable Game Standard)
-- Adapter contract (Sepolia): `0x03ec46e70e65dfd5728d1198b6fc345a0a72a561a394919efbf455672bdd46cd`
-- Adapter class hash: `0x0f18375f0d83ff91d5831630c658826e46505073aefea144ed9fb58517c0e76`
+- Adapter contract (Sepolia): `0x0512e1ac90f210c337a7e3b25a9ec1e602de6cf1a9254ed129b9881bca814525`
+- Adapter class hash: `0x34a52a871cff7bd50a6ccc73bfe031e40a45aa6d0bb2be08df07ed2b22ed919`
 - Denshokan Token (Sepolia): `0x0142712722e62a38f9c40fcc904610e1a14c70125876ecaaf25d803556734467`
 - MinigameRegistry (Sepolia): `0x040f1ed9880611bb7273bf51fd67123ebbba04c282036e2f81314061f6f9b1a1`
 - Adapter workspace: `contracts-egs/` (Cairo 2.16.0, Scarb 2.16.0, separate from Dojo)
 - Build: `SCARB=~/.local/share/scarb-install/latest/bin/scarb scarb build` (in contracts-egs/)
 - Deploy: `SCARB=~/.local/share/scarb-install/latest/bin/scarb ~/.local/bin/sncast -p sepolia declare/deploy`
 - sncast 0.55.0 at `~/.local/bin/sncast`, snfoundry config in `contracts-egs/snfoundry.toml`
+- Verify tokens: `sncast -p sepolia call --contract-address <adapter> --function get_token_for_run --calldata <run_id>`
+
+### Architecture
+- Standalone contract (NOT a Dojo system) — separate Scarb workspace because EGS uses Cairo 2.16.0 / Scarb 2.16.0 while Dojo uses Cairo 2.13.1 / Scarb 2.13.1
+- Implements `IMinigameTokenData` (`score`, `game_over`) by cross-contract calling Dojo's `get_run`
+- Maps EGS `token_id` (felt252) ↔ Catacombs `run_id` (u64) via storage maps
+- Key function: `mint_and_register(to, run_id)` — mints Denshokan ERC721 token + binds to run in one tx
+- Frontend calls `mint_and_register` automatically after `start_run` (Sepolia/Mainnet only)
+- `score(token_id)` reads `run.score` from Dojo world in real-time (cross-contract call)
+- `game_over(token_id)` returns true when `run.status != Active`
+
+### When to redeploy the adapter
+- Only if `Run` struct fields/order change or `RunStatus` enum variants change in Dojo contracts
+- Adding new Dojo systems, models, or changing non-Run structs does NOT require adapter changes
+- Constructor takes `run_actions_address` — must match the current world's run_actions contract (check manifest)
+
+### Deployment gotchas
+- Constructor arg `run_actions_address` must be the run_actions address from the CURRENT Sepolia world manifest — if you deploy a new world (new seed), you must redeploy the adapter too
+- Cartridge Controller cannot deserialize complex ABI types like `Option<GameContextDetails>` — wrap complex calls in simple adapter functions (e.g. `mint(to)` instead of exposing raw `mint_game` with 14 params)
+- denshokan-sdk requires starknet.js >=9.0.0 — can't use yet (Dojo stack pins v8). Use raw `account.execute()` calls instead
+- Declare transactions on Sepolia can take 1-5 minutes to confirm — poll with `sncast tx-status` before deploying; transactions may be dropped and need re-submission
+- Estimated gas for declare can be high (~6-7 STRK) — keep deployer funded via Sepolia faucet
 
 ## Cloudflare
 - Token in `.env` as `CLOUDFLARE_TOKEN` — account-scoped API Token (DNS Zone Edit + R2 Admin)

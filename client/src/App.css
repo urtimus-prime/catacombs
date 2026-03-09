@@ -997,6 +997,16 @@ body::after {
   color: var(--blood-400);
 }
 
+.roster-status.in-run {
+  color: var(--amber);
+  font-size: 13px;
+}
+
+.roster-item.in-run {
+  border-color: var(--amber);
+  box-shadow: 0 0 6px rgba(217, 164, 65, 0.3);
+}
+
 .roster-add {
   border-style: dashed;
   border-color: var(--stone-600);
@@ -1438,5 +1448,258 @@ body::after {
 
   .stat-value {
     font-size: 12px;
+  }
+}
+
+/* ===== RUN HISTORY ===== */
+
+.run-history {
+  margin-top: 12px;
+}
+
+.run-history-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--amber);
+  margin: 0 0 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.run-history-list {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stone-700) transparent;
+}
+
+.run-log-entry {
+  background: var(--stone-900);
+  border: 1px solid var(--stone-700);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.run-log-entry.result-success { border-left: 3px solid var(--venom-400); }
+.run-log-entry.result-partial { border-left: 3px solid var(--amber); }
+.run-log-entry.result-failure { border-left: 3px solid var(--blood-400); }
+.run-log-entry.result-n\/a { border-left: 3px solid var(--stone-600); }
+
+.log-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.log-icon {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+}
+
+.log-node-type {
+  font-weight: 600;
+  color: var(--stone-200);
+}
+
+.log-check {
+  color: var(--stone-400);
+  font-size: 11px;
+}
+
+.log-result {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.log-effects {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--stone-400);
+}
+
+.log-hp.damage { color: var(--blood-400); }
+.log-hp.heal { color: var(--venom-400); }
+.log-xp { color: var(--amber-400, var(--amber)); }
+.log-score { color: var(--stone-300); }
+.log-levelup { color: var(--amber); font-weight: 700; }
+.log-hp-after { margin-left: auto; color: var(--stone-500); }
+.log-tx {
+  color: var(--stone-500);
+  text-decoration: underline;
+  font-size: 10px;
+}
+.log-tx:hover { color: var(--amber); }
+
+/* ===== RUN END SCREEN (Defeat / Victory) ===== */
+
+.run-end-screen {
+  position: relative;
+  animation: run-end-fade-in 0.8s ease both;
+}
+
+@keyframes run-end-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.run-end-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  animation: vignette-pulse 3s ease-in-out infinite alternate;
+}
+
+.run-end-screen.defeat .run-end-vignette {
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(69, 10, 10, 0.6) 100%);
+}
+
+.run-end-screen.victory .run-end-vignette {
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(120, 53, 15, 0.4) 100%);
+}
+
+@keyframes vignette-pulse {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+.run-end-content {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  padding: 32px 20px 20px;
+}
+
+.run-end-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 42px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+  animation: title-slide-in 0.6s ease both;
+  animation-delay: 0.3s;
+}
+
+@keyframes title-slide-in {
+  from { opacity: 0; transform: translateY(20px); letter-spacing: 0.3em; }
+  to { opacity: 1; transform: translateY(0); letter-spacing: 0.1em; }
+}
+
+.run-end-screen.defeat .run-end-title {
+  color: var(--blood-500);
+  text-shadow: 0 0 40px rgba(239, 68, 68, 0.3), 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.run-end-screen.victory .run-end-title {
+  color: var(--amber-400);
+  text-shadow: 0 0 40px rgba(245, 158, 11, 0.3), 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.run-end-divider {
+  width: 80px;
+  height: 2px;
+  margin: 16px auto 24px;
+  animation: divider-expand 0.5s ease both;
+  animation-delay: 0.6s;
+}
+
+@keyframes divider-expand {
+  from { width: 0; opacity: 0; }
+  to { width: 80px; opacity: 1; }
+}
+
+.run-end-screen.defeat .run-end-divider {
+  background: linear-gradient(90deg, transparent, var(--blood-600), transparent);
+}
+
+.run-end-screen.victory .run-end-divider {
+  background: linear-gradient(90deg, transparent, var(--amber-600), transparent);
+}
+
+.run-end-stats {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  margin-bottom: 24px;
+  animation: stats-fade-in 0.5s ease both;
+  animation-delay: 0.8s;
+}
+
+@keyframes stats-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.run-end-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.run-end-stat-value {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--stone-100);
+}
+
+.run-end-stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--stone-500);
+}
+
+.run-end-btn {
+  margin-top: 24px;
+  animation: btn-fade-in 0.4s ease both;
+  animation-delay: 1s;
+}
+
+@keyframes btn-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.run-end-screen .run-history {
+  animation: stats-fade-in 0.5s ease both;
+  animation-delay: 0.9s;
+  text-align: left;
+}
+
+/* Mobile adjustments */
+@media (max-width: 640px) {
+  .run-end-title {
+    font-size: 32px;
+  }
+
+  .run-end-stats {
+    gap: 32px;
+  }
+
+  .run-end-stat-value {
+    font-size: 24px;
+  }
+
+  .run-end-content {
+    padding: 20px 12px 16px;
   }
 }

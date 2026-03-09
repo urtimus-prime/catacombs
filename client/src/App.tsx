@@ -49,6 +49,22 @@ interface NodeState {
   skill_tag_1: string; skill_tag_2: string; difficulty: number;
 }
 
+interface RunLogEntry {
+  node_id: number;
+  node_type: string;
+  skill_tag: string;
+  cat_stat: number;
+  roll: number;
+  difficulty: number;
+  result: "success" | "partial" | "failure" | "n/a";
+  hp_delta: number;
+  xp_gained: number;
+  score_delta: number;
+  cat_hp_after: number;
+  leveled_up: boolean;
+  tx_hash?: string;
+}
+
 // Appearance data matching the on-chain bit-packed felt252
 interface AppearanceData {
   primaryR: number; primaryG: number; primaryB: number;
@@ -221,12 +237,18 @@ function App() {
   const [catIdleAnim, setCatIdleAnim] = useState(IDLE_ANIM);
   const [run, setRun] = useState<RunState | null>(null);
   const [nodes, setNodes] = useState<NodeState[]>([]);
+  const [runLog, setRunLog] = useState<RunLogEntry[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [defeat, setDefeat] = useState<{ score: number; nodesVisited: number; status: string } | null>(null);
   const txIdRef = useRef(1);
 
   const selectedEntry = cats.find(e => e.cat.id === selectedCatId);
   const cat = selectedEntry?.cat ?? null;
   const catAppearance = selectedEntry?.appearance ?? null;
+
+  // The cat actually on the active run (for stats bar on Catacombs tab)
+  const runCatEntry = (run && run.status === 0) ? cats.find(e => e.cat.id === run.cat_id) : null;
+  const runCat = runCatEntry?.cat ?? null;
 
   // Use refs for latest state to avoid stale closures in callbacks
   const catRef = useRef(cat);
@@ -273,10 +295,10 @@ function App() {
       } catch { continue; }
     }
     setCats(found);
-    if (found.length > 0 && !selectedCatId) {
-      setSelectedCatId(found[0].cat.id);
+    if (found.length > 0) {
+      setSelectedCatId(prev => prev ?? found[0].cat.id);
     }
-  }, [client, selectedCatId]);
+  }, [client]);
 
   const fetchShinies = useCallback(async () => {
     if (!address) return;
@@ -357,17 +379,18 @@ function App() {
 
   // Core transaction wrapper: executes fn, waits for tx, then runs onConfirmed callback
   const wrap = useCallback(
-    async (fn: () => Promise<any>, actionName: string, onConfirmed?: () => Promise<void>) => {
+    async (fn: () => Promise<any>, actionName: string, onConfirmed?: (txHash?: string) => Promise<void>) => {
       if (!account) return;
       setPending(true);
       try {
         const result = await fn();
-        if (result?.transaction_hash) {
+        const txHash = result?.transaction_hash;
+        if (txHash) {
           addToast(`${actionName}...`, "info");
-          await rpcProvider.waitForTransaction(result.transaction_hash, { retryInterval: 500 });
+          await rpcProvider.waitForTransaction(txHash, { retryInterval: 500 });
         }
         if (onConfirmed) {
-          await onConfirmed();
+          await onConfirmed(txHash);
         }
         addToast(actionName, "success");
       } catch (e: any) {
@@ -416,9 +439,11 @@ function App() {
       },
     );
 
-  const startRun = () =>
-    wrap(
-      () => client.run_actions.start_run(account!, catRef.current?.id ?? 1),
+  const startRun = () => {
+    if (!catRef.current) { addToast("Select a cat first", "error"); return; }
+    const runCatId = catRef.current.id;
+    return wrap(
+      () => client.run_actions.start_run(account!, runCatId),
       "Start Run",
       async () => {
         // Poll for the new active run by scanning IDs
@@ -429,7 +454,7 @@ function App() {
               try {
                 const r2 = await client.run_actions.get_run(id);
                 const r = parseRun(r2);
-                if (r.cat_id > 0 && r.status === 0) return id;
+                if (r.cat_id === runCatId && r.status === 0) return id;
               } catch { continue; }
             }
             return -1;
@@ -437,39 +462,17 @@ function App() {
           (id) => id > 0,
         );
         if (found && found > 0) {
+          setRunLog([]);
+          setDefeat(null);
           await fetchRun(found);
-          // EGS: mint game token and bind it to this run (Sepolia/Mainnet only)
+          // EGS: mint game token and bind it to this run in one call (Sepolia/Mainnet only)
           if (CHAIN === "sepolia" || CHAIN === "mainnet") {
             try {
               addToast("Minting EGS token...", "info");
-              const mintResult = await client.egs_adapter.mint_game(account!, address!);
-              if (mintResult?.transaction_hash) {
-                const receipt = await rpcProvider.waitForTransaction(
-                  mintResult.transaction_hash, { retryInterval: 500 },
-                ) as any;
-                // Extract token_id from Transfer event (ERC721: from=0, to=player, token_id)
-                // Transfer event key[0] is the event selector, data contains [from, to, token_id_low, token_id_high]
-                // or for felt252 token: [from, to, token_id]
-                const transferEvents = (receipt.events ?? []).filter((e: any) =>
-                  e.keys?.[0] === "0x99cd8bde557814842a3121e8ddfd433a539b8c9f14bf31ebf108d12e6196e9" // Transfer selector
-                );
-                if (transferEvents.length > 0) {
-                  const ev = transferEvents[transferEvents.length - 1];
-                  // ERC721 Transfer: keys=[selector, from, to], data=[token_id_low, token_id_high]
-                  const tokenId = ev.data?.[0] ?? ev.keys?.[3];
-                  if (tokenId && tokenId !== "0x0") {
-                    addToast("Linking EGS token to run...", "info");
-                    const regResult = await client.egs_adapter.register_run(account!, tokenId, found);
-                    if (regResult?.transaction_hash) {
-                      await rpcProvider.waitForTransaction(regResult.transaction_hash, { retryInterval: 500 });
-                    }
-                    addToast("EGS token linked", "success");
-                  } else {
-                    addToast("EGS token minted (no binding)", "info");
-                  }
-                } else {
-                  addToast("EGS token minted", "success");
-                }
+              const egsResult = await client.egs_adapter.mint_and_register(account!, address!, found);
+              if (egsResult?.transaction_hash) {
+                await rpcProvider.waitForTransaction(egsResult.transaction_hash, { retryInterval: 500 });
+                addToast("EGS token linked", "success");
               }
             } catch (e: any) {
               // Non-fatal: run works fine without EGS binding
@@ -479,6 +482,7 @@ function App() {
         }
       },
     );
+  };
 
   const choosePath = (nodeId: number) => {
     // Find the target node to describe what we're heading into
@@ -499,18 +503,72 @@ function App() {
         return client.run_actions.choose_path(account!, r.id, nodeId);
       },
       label,
-      async () => {
+      async (txHash?: string) => {
         const r = runRef.current;
         if (!r) return;
-        // Poll until current_node_id changes to the new node
-        await pollUntil(
+        // Poll until node changes or run ends
+        const finalRunResult = await pollUntil(
           () => client.run_actions.get_run(r.id),
           (result) => {
-            try { return parseRun(result).current_node_id === nodeId; }
+            try {
+              const parsed = parseRun(result);
+              return parsed.current_node_id === nodeId || parsed.status !== 0;
+            }
             catch { return false; }
           },
         );
         await fetchRun(r.id);
+        // Check if run ended
+        const finalRun = finalRunResult ? parseRun(finalRunResult) : null;
+        const runEnded = finalRun && finalRun.status !== 0;
+        // Read resolution outcome and add to run log
+        try {
+          const outcome = await client.run_actions.get_node_outcome(r.id, nodeId);
+          // Fields: [0]=run_id, [1]=node_id, [2]=skill_tag, [3]=cat_stat, [4]=roll,
+          // [5]=difficulty, [6]=result, [7]=hp_delta, [8]=xp_gained, [9]=score_delta,
+          // [10]=cat_hp_after, [11]=cat_xp_after, [12]=leveled_up
+          const b = (i: number) => BigInt(outcome[i]);
+          const n = (i: number) => Number(b(i));
+          const resultCode = n(6);
+          // hp_delta is i8 in Cairo — negative values are stored as felt252 (prime - abs)
+          const FELT_PRIME = 2n ** 251n + 17n * 2n ** 192n + 1n;
+          const rawHpBig = b(7);
+          const hpDelta = rawHpBig > FELT_PRIME / 2n
+            ? Number(rawHpBig - FELT_PRIME)  // negative
+            : Number(rawHpBig);              // positive or zero
+          const entry: RunLogEntry = {
+            node_id: nodeId,
+            node_type: targetType,
+            skill_tag: felt252ToString(outcome[2]),
+            cat_stat: n(3),
+            roll: n(4),
+            difficulty: n(5),
+            result: resultCode === 1 ? "success" : resultCode === 2 ? "partial" : resultCode === 3 ? "failure" : "n/a",
+            hp_delta: hpDelta,
+            xp_gained: n(8),
+            score_delta: n(9),
+            cat_hp_after: n(10),
+            leveled_up: !!n(12),
+            tx_hash: txHash,
+          };
+          setRunLog(prev => [...prev, entry]);
+          // Show result toast
+          if (resultCode >= 1 && resultCode <= 3) {
+            const tag = ["", "Success", "Partial", "Failure"][resultCode];
+            const hpStr = hpDelta > 0 ? `+${hpDelta}` : `${hpDelta}`;
+            addToast(`${tag}: ${hpStr} HP, +${entry.xp_gained} XP${entry.leveled_up ? " \u2191 LEVEL UP!" : ""}`, resultCode === 1 ? "success" : resultCode === 3 ? "error" : "info");
+          }
+          // Refresh cat stats after resolution
+          if (catRef.current) await fetchCat(catRef.current.id);
+        } catch { /* outcome read failed, non-fatal */ }
+        // Show defeat/victory screen if run ended
+        if (runEnded && finalRun) {
+          setDefeat({
+            score: finalRun.score,
+            nodesVisited: finalRun.nodes_visited,
+            status: RUN_STATUS[finalRun.status] ?? "Failed",
+          });
+        }
       },
     );
   };
@@ -527,7 +585,7 @@ function App() {
         const r = runRef.current;
         if (r) {
           // Poll until run status changes from Active (0)
-          await pollUntil(
+          const finalResult = await pollUntil(
             () => client.run_actions.get_run(r.id),
             (result) => {
               try { return parseRun(result).status !== 0; }
@@ -535,8 +593,14 @@ function App() {
             },
           );
           await fetchRun(r.id);
+          const finalRun = finalResult ? parseRun(finalResult) : null;
+          setDefeat({
+            score: finalRun?.score ?? r.score ?? 0,
+            nodesVisited: finalRun?.nodes_visited ?? r.nodes_visited ?? 0,
+            status: "Failed",
+          });
         }
-        await fetchCat(catRef.current?.id ?? 1);
+        if (catRef.current) await fetchCat(catRef.current.id);
       },
     );
 
@@ -552,6 +616,7 @@ function App() {
           const r = parseRun(result);
           if (r.cat_id > 0 && r.status === 0) {
             await fetchRun(id);
+            setSelectedCatId(r.cat_id);
             return;
           }
         } catch { continue; }
@@ -573,20 +638,28 @@ function App() {
   const currentNode = nodes.find(n => n.node_id === run?.current_node_id);
   const currentNodeType = currentNode ? NODE_TYPES[currentNode.node_type] : undefined;
   const catAnimation = connected
-    ? (tab === "cats" ? catIdleAnim : getCatAnimation(run, currentNodeType, pending))
+    ? (tab === "cats" ? catIdleAnim
+      : defeat ? (defeat.status === "Completed" ? VICTORY_ANIM : DEFEAT_ANIM)
+      : getCatAnimation(run, currentNodeType, pending))
     : connectDance;
-  const catScene = connected ? getCatScene(currentNodeType) : "default_studio";
+  const catScene = connected
+    ? (defeat ? "cozy_fireplace" : getCatScene(currentNodeType))
+    : "default_studio";
   const viewerSlotClass = connected ? `cat-viewer-slot slot-${tab}` : "cat-viewer-slot slot-connect";
 
   // Show the cat's on-chain appearance in the viewer (creator overrides when active)
+  // On Catacombs tab, show the running cat; on Cats tab, show the selected/browsed cat
+  const viewerCatAppearance = (tab === "catacombs" && runCatEntry)
+    ? runCatEntry.appearance
+    : catAppearance;
   const activeAppearance = (tab === "cats" && creating)
     ? appearance
-    : catAppearance ?? defaultAppearance();
+    : viewerCatAppearance ?? defaultAppearance();
   // Memoize so the reference only changes when actual values change or cat selection changes
   const viewerAppearance = useMemo(
     () => appearanceToViewerConfig(activeAppearance),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedCatId, creating, JSON.stringify(activeAppearance)]
+    [selectedCatId, tab, run?.cat_id, creating, JSON.stringify(activeAppearance)]
   );
 
   return (
@@ -660,10 +733,12 @@ function App() {
               {/* Cat Roster */}
               {cats.length > 0 && (
                 <div className="cat-roster">
-                  {cats.map(entry => (
+                  {cats.map(entry => {
+                    const isRunning = run && run.status === 0 && run.cat_id === entry.cat.id;
+                    return (
                     <button
                       key={entry.cat.id}
-                      className={`roster-item ${entry.cat.id === selectedCatId ? "selected" : ""}`}
+                      className={`roster-item ${entry.cat.id === selectedCatId ? "selected" : ""} ${isRunning ? "in-run" : ""}`}
                       onClick={() => {
                         setSelectedCatId(entry.cat.id);
                         setCatIdleAnim(prev => pickRandom(IDLE_ANIMS, prev));
@@ -671,11 +746,16 @@ function App() {
                     >
                       <span className="roster-id">#{entry.cat.id}</span>
                       <span className="roster-level">Lv.{entry.cat.level}</span>
-                      <span className={`roster-status ${entry.cat.alive ? "" : "wounded"}`}>
-                        {entry.cat.alive ? "\u2665" : "\u2620"}
-                      </span>
+                      {isRunning ? (
+                        <span className="roster-status in-run">{"\u2302"}</span>
+                      ) : (
+                        <span className={`roster-status ${entry.cat.alive ? "" : "wounded"}`}>
+                          {entry.cat.alive ? "\u2665" : "\u2620"}
+                        </span>
+                      )}
                     </button>
-                  ))}
+                    );
+                  })}
                   <button className="roster-item roster-add" onClick={() => setCreating(true)}>
                     <span className="roster-plus">+</span>
                   </button>
@@ -735,14 +815,14 @@ function App() {
           {run && run.status === 0 ? (
             <>
               {/* Compact cat stats bar */}
-              {cat && (
+              {runCat && (
                 <div className="cat-stats-bar">
-                  <span className="cat-stats-name">Cat #{cat.id}</span>
-                  <span className="cat-stat"><span className="stat-icon hp">{"\u2665"}</span> {cat.hp}/{cat.max_hp}</span>
-                  <span className="cat-stat"><span className="stat-icon atk">{"\u2694"}</span>{cat.attack}</span>
-                  <span className="cat-stat"><span className="stat-icon def">{"\u25C6"}</span>{cat.defense}</span>
-                  <span className="cat-stat"><span className="stat-icon spd">{"\u2192"}</span>{cat.speed}</span>
-                  <span className="cat-stat"><span className="stat-icon lck">{"\u2618"}</span>{cat.luck}</span>
+                  <span className="cat-stats-name">Cat #{runCat.id}</span>
+                  <span className="cat-stat"><span className="stat-icon hp">{"\u2665"}</span> {runCat.hp}/{runCat.max_hp}</span>
+                  <span className="cat-stat"><span className="stat-icon atk">{"\u2694"}</span>{runCat.attack}</span>
+                  <span className="cat-stat"><span className="stat-icon def">{"\u25C6"}</span>{runCat.defense}</span>
+                  <span className="cat-stat"><span className="stat-icon spd">{"\u2192"}</span>{runCat.speed}</span>
+                  <span className="cat-stat"><span className="stat-icon lck">{"\u2618"}</span>{runCat.luck}</span>
                   <button className="btn-abandon" onClick={abandonRun} disabled={pending}>Flee</button>
                 </div>
               )}
@@ -755,7 +835,39 @@ function App() {
                 onChoosePath={choosePath}
                 pending={pending}
               />
+
+              {/* Run History */}
+              {runLog.length > 0 && (
+                <RunHistory entries={runLog} explorerUrl={EXPLORER_URL} />
+              )}
             </>
+          ) : defeat ? (
+            /* Defeat / Victory overlay */
+            <div className={`run-end-screen ${defeat.status === "Completed" ? "victory" : "defeat"}`}>
+              <div className="run-end-vignette" />
+              <div className="run-end-content">
+                <h2 className="run-end-title">
+                  {defeat.status === "Completed" ? "Victory" : "Defeated"}
+                </h2>
+                <div className="run-end-divider" />
+                <div className="run-end-stats">
+                  <div className="run-end-stat">
+                    <span className="run-end-stat-value">{defeat.score}</span>
+                    <span className="run-end-stat-label">Score</span>
+                  </div>
+                  <div className="run-end-stat">
+                    <span className="run-end-stat-value">{defeat.nodesVisited}</span>
+                    <span className="run-end-stat-label">Nodes</span>
+                  </div>
+                </div>
+                {runLog.length > 0 && (
+                  <RunHistory entries={runLog} explorerUrl={EXPLORER_URL} />
+                )}
+                <button className="btn btn-primary run-end-btn" onClick={() => setDefeat(null)}>
+                  Continue
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="card">
               <h3 className="card-title">Run</h3>
@@ -764,10 +876,20 @@ function App() {
                   {run ? `Last run: ${RUN_STATUS[run.status]}` : "No active run"}
                 </p>
                 {cat ? (
-                  <button className="btn btn-primary" onClick={startRun}
-                    disabled={pending || !cat.alive}>
-                    Begin Descent
-                  </button>
+                  <>
+                    <p style={{ fontSize: 13, color: "var(--amber)", marginBottom: 8 }}>
+                      Sending Cat #{cat.id} (Lv.{cat.level})
+                    </p>
+                    <button className="btn btn-primary" onClick={startRun}
+                      disabled={pending || !cat.alive}>
+                      Begin Descent
+                    </button>
+                    {!cat.alive && (
+                      <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 6 }}>
+                        This cat is wounded and cannot run
+                      </p>
+                    )}
+                  </>
                 ) : (
                   <p style={{ fontSize: 12, color: "var(--stone-500)" }}>
                     Summon a cat first in the Cats tab
@@ -891,6 +1013,65 @@ function StatCell({ label, value, hpLevel, accent }: {
   );
 }
 
+const RESULT_LABELS: Record<string, string> = {
+  success: "\u2713 Success", partial: "\u25CB Partial", failure: "\u2717 Failure", "n/a": "",
+};
+const RESULT_COLORS: Record<string, string> = {
+  success: "var(--venom-400)", partial: "var(--amber)", failure: "var(--blood-400)", "n/a": "var(--stone-400)",
+};
+
+const SKILL_LABEL: Record<string, string> = {
+  combat: "ATK", stealth: "SPD", agility: "SPD", charm: "LCK", arcane: "DEF", survival: "ATK",
+};
+
+function RunHistory({ entries, explorerUrl }: { entries: RunLogEntry[]; explorerUrl: string }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+  }, [entries.length]);
+
+  return (
+    <div className="run-history">
+      <h4 className="run-history-title">Run Log</h4>
+      <div className="run-history-list" ref={listRef}>
+        {entries.map((e, i) => {
+          const icon = NODE_ICONS[e.node_type] ?? SKILL_ICONS[e.skill_tag] ?? "\u25C9";
+          const hpStr = e.hp_delta > 0 ? `+${e.hp_delta}` : `${e.hp_delta}`;
+          const isSkillCheck = e.result !== "n/a" && e.roll > 0;
+          const isBoss = e.node_type === "Boss";
+          const threshold = isBoss ? 18 : e.difficulty * 4 + 4;
+          return (
+            <div key={i} className={`run-log-entry result-${e.result}`}>
+              <div className="log-header">
+                <span className="log-icon">{icon}</span>
+                <span className="log-node-type">{e.node_type}</span>
+                {isSkillCheck && (
+                  <span className="log-check">
+                    {e.skill_tag ? `${e.skill_tag} (${SKILL_LABEL[e.skill_tag] ?? "?"} ${e.cat_stat})` : ""} d20:{e.roll} vs {threshold}
+                  </span>
+                )}
+                <span className="log-result" style={{ color: RESULT_COLORS[e.result] }}>
+                  {RESULT_LABELS[e.result]}
+                </span>
+              </div>
+              <div className="log-effects">
+                <span className={`log-hp ${e.hp_delta >= 0 ? "heal" : "damage"}`}>{hpStr} HP</span>
+                <span className="log-xp">+{e.xp_gained} XP</span>
+                {e.score_delta > 0 && <span className="log-score">+{e.score_delta} pts</span>}
+                {e.leveled_up && <span className="log-levelup">{"\u2191"} LEVEL UP!</span>}
+                <span className="log-hp-after">{e.cat_hp_after} HP left</span>
+                {explorerUrl && e.tx_hash && (
+                  <a className="log-tx" href={`${explorerUrl}/tx/${e.tx_hash}`} target="_blank" rel="noopener">tx</a>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Animation mapping: node type -> cat animation
 const NODE_ANIM: Record<string, string> = {
   Start: "Idle_Dreamer",
@@ -903,6 +1084,8 @@ const NODE_ANIM: Record<string, string> = {
 };
 
 const PENDING_ANIM = "Cat_Walking_Backwards";
+const DEFEAT_ANIM = "Sword_Death";
+const VICTORY_ANIM = "Cat_Robot_Hip_Hop_Dance";
 const IDLE_ANIM = "Idle_Dreamer";
 
 const DANCE_ANIMS = ["Cat_Macarena_Dance", "Cat_Robot_Hip_Hop_Dance", "Cat_Salsa_Dancing"];

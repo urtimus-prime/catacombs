@@ -1,5 +1,5 @@
 use catacombs::models::run::Run;
-use catacombs::models::node::Node;
+use catacombs::models::node::{Node, NodeOutcome};
 
 #[starknet::interface]
 pub trait IRunActions<T> {
@@ -8,6 +8,7 @@ pub trait IRunActions<T> {
     fn abandon_run(ref self: T, run_id: u64);
     fn get_run(self: @T, run_id: u64) -> Run;
     fn get_node(self: @T, run_id: u64, node_id: u8) -> Node;
+    fn get_node_outcome(self: @T, run_id: u64, node_id: u8) -> NodeOutcome;
 }
 
 #[dojo::contract]
@@ -18,11 +19,11 @@ pub mod run_actions {
     use core::dict::{Felt252Dict, Felt252DictTrait};
     use dojo::model::ModelStorage;
     use dojo::event::EventStorage;
-    use catacombs::models::cat::Cat;
+    use catacombs::models::cat::{Cat, CatLeveledUp};
     use catacombs::models::run::{Run, RunStatus, RunCounter, RunStarted, RunCompleted};
-    use catacombs::models::node::{Node, NodeType, NodeVisited, PathChosen};
+    use catacombs::models::node::{Node, NodeType, NodeVisited, PathChosen, NodeResolved, NodeOutcome};
     use catacombs::helpers::random::RandomTrait;
-    use catacombs::helpers::skills::skill_tag_at;
+    use catacombs::helpers::skills::{skill_tag_at, stat_for_skill};
 
     #[abi(embed_v0)]
     impl RunActionsImpl of IRunActions<ContractState> {
@@ -68,22 +69,177 @@ pub mod run_actions {
             let mut run: Run = world.read_model(run_id);
             assert!(run.status == RunStatus::Active, "run not active");
 
-            let cat: Cat = world.read_model(run.cat_id);
+            let mut cat: Cat = world.read_model(run.cat_id);
             assert!(cat.owner == caller, "not your cat");
 
             let current_node: Node = world.read_model((run_id, run.current_node_id));
             let mask: u32 = InternalImpl::bit_mask(next_node_id);
             assert!(current_node.connections & mask != 0, "no path to that node");
 
-            let next_node: Node = world.read_model((run_id, next_node_id));
+            let mut next_node: Node = world.read_model((run_id, next_node_id));
             assert!(!next_node.resolved, "node already visited");
 
             run.current_node_id = next_node_id;
             run.nodes_visited += 1;
-            world.write_model(@run);
 
             world.emit_event(@PathChosen { run_id, from_node: current_node.node_id, to_node: next_node_id });
             world.emit_event(@NodeVisited { run_id, node_id: next_node_id, node_type: next_node.node_type });
+
+            // ── Auto-resolve the node ──
+            let mut rng = RandomTrait::new_deterministic(next_node.outcome_seed);
+            let mut hp_delta: i8 = 0;
+            let mut xp_gained: u16 = 0;
+            let mut score_delta: u32 = 0;
+            let mut result: u8 = 0; // 0=N/A
+            let mut roll: u8 = 0;
+            let mut cat_stat: u8 = 0;
+            let mut skill_tag: felt252 = 0;
+            let mut leveled_up = false;
+
+            let nt = next_node.node_type;
+
+            if nt == NodeType::Rest {
+                // Rest: heal 25% of max_hp
+                let heal: u8 = cat.max_hp / 4;
+                let new_hp = cat.hp + heal;
+                cat.hp = if new_hp > cat.max_hp { cat.max_hp } else { new_hp };
+                hp_delta = heal.try_into().unwrap();
+                xp_gained = 5;
+                result = 1; // Success
+            } else if nt == NodeType::Treasure {
+                // Treasure: score + XP, no HP cost
+                score_delta = 25;
+                xp_gained = 10;
+                result = 1; // Success
+            } else if nt == NodeType::Combat || nt == NodeType::Event || nt == NodeType::Boss {
+                // Skill check: d20 + stat vs difficulty threshold
+                skill_tag = next_node.skill_tag_1;
+                cat_stat = stat_for_skill(@cat, skill_tag);
+                roll = rng.between(1_u8, 20_u8);
+
+                // Threshold scales with difficulty (1-3): 8, 12, 16
+                // Boss uses fixed high threshold
+                let threshold: u8 = if nt == NodeType::Boss {
+                    18
+                } else {
+                    next_node.difficulty * 4 + 4
+                };
+
+                let total = roll + cat_stat;
+
+                if total >= threshold {
+                    // Success: base HP cost only
+                    result = 1;
+                    hp_delta = -5;
+                    xp_gained = if nt == NodeType::Boss { 50 } else { 15 };
+                    score_delta = if nt == NodeType::Boss { 100 } else { 10 };
+                } else if total + 2 >= threshold {
+                    // Partial: moderate damage
+                    result = 2;
+                    hp_delta = -10;
+                    xp_gained = if nt == NodeType::Boss { 30 } else { 10 };
+                    score_delta = if nt == NodeType::Boss { 50 } else { 5 };
+                } else {
+                    // Failure: heavy damage
+                    result = 3;
+                    hp_delta = -20;
+                    xp_gained = 5;
+                    score_delta = 0;
+                }
+
+                // Apply HP damage (clamp to 0)
+                let damage: u8 = (-hp_delta).try_into().unwrap();
+                cat.hp = if damage >= cat.hp { 0 } else { cat.hp - damage };
+            }
+
+            // Apply XP and check level-up
+            cat.xp += xp_gained.into();
+            let xp_needed: u32 = cat.level.into() * 100;
+            if cat.xp >= xp_needed {
+                cat.level += 1;
+                cat.max_hp += 5;
+                // Increase 2 stats deterministically from seed
+                let stat_roll: u8 = rng.between(0_u8, 3_u8);
+                if stat_roll == 0 { cat.attack += 1; cat.defense += 1; }
+                else if stat_roll == 1 { cat.attack += 1; cat.speed += 1; }
+                else if stat_roll == 2 { cat.defense += 1; cat.luck += 1; }
+                else { cat.speed += 1; cat.luck += 1; }
+                leveled_up = true;
+                world.emit_event(@CatLeveledUp { cat_id: cat.id, new_level: cat.level });
+            }
+
+            // Apply score
+            run.score += score_delta;
+
+            // Mark node resolved
+            next_node.resolved = true;
+            world.write_model(@next_node);
+
+            // Store resolution outcome for client reads
+            world.write_model(@NodeOutcome {
+                run_id,
+                node_id: next_node_id,
+                skill_tag,
+                cat_stat,
+                roll,
+                difficulty: next_node.difficulty,
+                result,
+                hp_delta,
+                xp_gained,
+                score_delta,
+                cat_hp_after: cat.hp,
+                cat_xp_after: cat.xp,
+                leveled_up,
+            });
+
+            // Emit resolution event
+            world.emit_event(@NodeResolved {
+                run_id,
+                node_id: next_node_id,
+                node_type: nt,
+                skill_tag,
+                cat_stat,
+                roll,
+                difficulty: next_node.difficulty,
+                result,
+                hp_delta,
+                xp_gained,
+                score_delta,
+                cat_hp_after: cat.hp,
+                cat_xp_after: cat.xp,
+                leveled_up,
+            });
+
+            // Check cat death
+            if cat.hp == 0 {
+                run.status = RunStatus::Failed;
+                cat.runs_failed += 1;
+                cat.hp = 1; // wounded but alive
+                world.write_model(@run);
+                world.write_model(@cat);
+                world.emit_event(@RunCompleted { run_id, cat_id: cat.id, score: run.score, status: RunStatus::Failed });
+                return;
+            }
+
+            // Check boss outcome — any boss result ends the run
+            if nt == NodeType::Boss {
+                if result != 3 {
+                    // Victory (success or partial)
+                    run.status = RunStatus::Completed;
+                    cat.runs_completed += 1;
+                } else {
+                    // Defeat
+                    run.status = RunStatus::Failed;
+                    cat.runs_failed += 1;
+                }
+                world.write_model(@run);
+                world.write_model(@cat);
+                world.emit_event(@RunCompleted { run_id, cat_id: cat.id, score: run.score, status: run.status });
+                return;
+            }
+
+            world.write_model(@run);
+            world.write_model(@cat);
         }
 
         fn abandon_run(ref self: ContractState, run_id: u64) {
@@ -111,6 +267,11 @@ pub mod run_actions {
         }
 
         fn get_node(self: @ContractState, run_id: u64, node_id: u8) -> Node {
+            let world = self.world_default();
+            world.read_model((run_id, node_id))
+        }
+
+        fn get_node_outcome(self: @ContractState, run_id: u64, node_id: u8) -> NodeOutcome {
             let world = self.world_default();
             world.read_model((run_id, node_id))
         }

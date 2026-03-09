@@ -10,6 +10,10 @@
 
 #[starknet::interface]
 pub trait ICatacombsAdapter<T> {
+    /// Mint an EGS game token with default settings. Returns the token_id.
+    fn mint(ref self: T, to: starknet::ContractAddress) -> felt252;
+    /// Mint an EGS token and bind it to a run in one call.
+    fn mint_and_register(ref self: T, to: starknet::ContractAddress, run_id: u64) -> felt252;
     /// Bind an EGS token to a Catacombs run. Caller must own the token.
     fn register_run(ref self: T, token_id: felt252, run_id: u64);
     /// Look up which run a token is bound to (0 = unbound).
@@ -166,6 +170,46 @@ mod CatacombsEgsAdapter {
 
     #[abi(embed_v0)]
     impl CatacombsAdapterImpl of super::ICatacombsAdapter<ContractState> {
+        fn mint(ref self: ContractState, to: ContractAddress) -> felt252 {
+            self
+                .minigame
+                .mint_game(
+                    Option::None, // player_name
+                    Option::None, // settings_id
+                    Option::None, // start
+                    Option::None, // end
+                    Option::None, // objective_id
+                    Option::None, // context
+                    Option::None, // client_url
+                    Option::None, // renderer_address
+                    Option::None, // skills_address
+                    to,
+                    false, // soulbound
+                    false, // paymaster
+                    0,     // salt (adapter doesn't need randomness)
+                    0,     // metadata
+                )
+        }
+
+        fn mint_and_register(ref self: ContractState, to: ContractAddress, run_id: u64) -> felt252 {
+            let token_id = self.mint(to);
+
+            // Bind token <-> run (inline instead of calling register_run to avoid ownership check
+            // since the token was just minted to `to` and caller is `to`)
+            assert!(self.run_to_token.read(run_id) == 0, "run already bound");
+            self.minigame.pre_action(token_id);
+            self.token_to_run.write(token_id, run_id);
+            self.run_to_token.write(run_id, token_id);
+            self
+                .emit(
+                    RunRegistered {
+                        token_id, run_id, player: get_caller_address(),
+                    },
+                );
+            self.minigame.post_action(token_id);
+            token_id
+        }
+
         fn register_run(ref self: ContractState, token_id: felt252, run_id: u64) {
             // Verify caller owns the EGS token
             self.minigame.assert_token_ownership(token_id);

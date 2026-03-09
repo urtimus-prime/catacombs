@@ -17,7 +17,7 @@ export const dojoConfig = createDojoConfig({ manifest, rpcUrl: RPC_URL, toriiUrl
 // EGS (Embeddable Game Standard) contract addresses — Sepolia only for now
 export const EGS_ADAPTER_ADDRESS =
   import.meta.env.VITE_EGS_ADAPTER_ADDRESS ??
-  "0x03ec46e70e65dfd5728d1198b6fc345a0a72a561a394919efbf455672bdd46cd";
+  "0x0512e1ac90f210c337a7e3b25a9ec1e602de6cf1a9254ed129b9881bca814525";
 
 export const DENSHOKAN_TOKEN_ADDRESS =
   import.meta.env.VITE_DENSHOKAN_TOKEN_ADDRESS ??

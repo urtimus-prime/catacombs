@@ -1,13 +1,10 @@
 {
   "world": {
-    "class_hash": "0x18cd799a3adc9c352f7e4c307008b2cd67f805e456e9526ceda6f58e7723dbc",
-    "address": "0x12a332f8daacb1d871d7d455f6fbfd3c9b283572fd2d0e74963577ce435b51f",
+    "class_hash": "0x613551abceb2b37073b1149bb862ea70cf029981ce1ca47e9dd7c7ab97cb65d",
+    "address": "0x6d0cbcf0cfcc7cf77cfe609816dd4818f56027824216ec0d95df4cf456ed00c",
     "seed": "catacombs",
     "name": "Catacombs",
     "entrypoints": [
-      "set_entity_test",
-      "delete_entity_test",
-      "emit_event_test",
       "uuid",
       "set_metadata",
       "register_namespace",
@@ -36,7 +33,7 @@
   },
   "contracts": [
     {
-      "address": "0x27b6f605ebf00482a1184c7fc5c68e1308f172ed2761523375f6b0f6ea2640a",
+      "address": "0x471c5e7075d2581cb510e5bbceb46627a2cbfeae4bfd6a382b94acedac9fa0",
       "class_hash": "0x5c2be564478d382e6d3fefdf254d50b99e22a5356bbb291fa05e829a4928721",
       "init_calldata": [],
       "tag": "catacombs-cat_actions",
@@ -48,7 +45,7 @@
       ]
     },
     {
-      "address": "0x4e864c410d55f45f10ed33ee3e9540b12e242bb739ba866d3fbe9d152d65012",
+      "address": "0x1f0af86877de75ee05a8c2ce0036f2d4c28f73bea85edb99f4b896792c6d41a",
       "class_hash": "0x72f2588c3048027050cd29a3b43dbbc4544d5c17fc2e928d05654589605d4f9",
       "init_calldata": [],
       "tag": "catacombs-encounter_actions",
@@ -60,8 +57,8 @@
       ]
     },
     {
-      "address": "0x1ab2b7a480c9db9d9f4e3d2c63567260bae8a35a073654d9bf224781b2c88f2",
-      "class_hash": "0x1fa27e2eded6d68d983a5fed3c8ecf192b5eb3848b6506734d2cf0668fd29e8",
+      "address": "0x6ed71e64fb1151f25ff85591b9ca0925ab93191a6ca9c506b02cf60a49f3f0b",
+      "class_hash": "0x94ab0c31df2d569c54c68ed6421d9c89e2b5cee3d0ff4befe827d4512cba83",
       "init_calldata": [],
       "tag": "catacombs-run_actions",
       "selector": "0xcf6b86b41041b5861f8891fa8034501cf0d41d779f0d7513777f3408b5331f",
@@ -73,7 +70,7 @@
       ]
     },
     {
-      "address": "0x22afc1faf97b0519095c4879ecd3004d0eab763341a731499bea2edf0908a34",
+      "address": "0x7fe2d396cae5305d36ac124f81eb22eaf2a464b3aad9d02557b1eb0d59289b4",
       "class_hash": "0x7a31e538a7c8f8cc665307ec243430298f7c8744cd6aae88da50bb226d76bdb",
       "init_calldata": [],
       "tag": "catacombs-shiny_actions",
@@ -368,6 +365,78 @@
     {
       "members": [
         {
+          "name": "run_id",
+          "type": "core::integer::u64",
+          "key": true
+        },
+        {
+          "name": "node_id",
+          "type": "core::integer::u8",
+          "key": true
+        },
+        {
+          "name": "skill_tag",
+          "type": "core::felt252",
+          "key": false
+        },
+        {
+          "name": "cat_stat",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "roll",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "difficulty",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "result",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "hp_delta",
+          "type": "core::integer::i8",
+          "key": false
+        },
+        {
+          "name": "xp_gained",
+          "type": "core::integer::u16",
+          "key": false
+        },
+        {
+          "name": "score_delta",
+          "type": "core::integer::u32",
+          "key": false
+        },
+        {
+          "name": "cat_hp_after",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "cat_xp_after",
+          "type": "core::integer::u32",
+          "key": false
+        },
+        {
+          "name": "leveled_up",
+          "type": "core::bool",
+          "key": false
+        }
+      ],
+      "class_hash": "0x42ee242999e4c7de9f97bad6254e9d9e941dad7457d89808eabc0d6aa40866",
+      "tag": "catacombs-NodeOutcome",
+      "selector": "0x60c7c99a26a68abeaeb3c2e725a9db0b7d80620db1df2274940bbb8d1a7c621"
+    },
+    {
+      "members": [
+        {
           "name": "owner",
           "type": "core::starknet::contract_address::ContractAddress",
           "key": true
@@ -611,6 +680,83 @@
       "class_hash": "0x5fa4d4297f720c6c8d63a94bbc5d1cc1ea6910f9801d021907ed1cbe088b937",
       "tag": "catacombs-ItemFound",
       "selector": "0xdd88230d5576a31bf51143ded059a24a4062c92e8ffe3f65bb09010ea80337"
+    },
+    {
+      "members": [
+        {
+          "name": "run_id",
+          "type": "core::integer::u64",
+          "key": true
+        },
+        {
+          "name": "node_id",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "node_type",
+          "type": "catacombs::models::node::NodeType",
+          "key": false
+        },
+        {
+          "name": "skill_tag",
+          "type": "core::felt252",
+          "key": false
+        },
+        {
+          "name": "cat_stat",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "roll",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "difficulty",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "result",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "hp_delta",
+          "type": "core::integer::i8",
+          "key": false
+        },
+        {
+          "name": "xp_gained",
+          "type": "core::integer::u16",
+          "key": false
+        },
+        {
+          "name": "score_delta",
+          "type": "core::integer::u32",
+          "key": false
+        },
+        {
+          "name": "cat_hp_after",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "cat_xp_after",
+          "type": "core::integer::u32",
+          "key": false
+        },
+        {
+          "name": "leveled_up",
+          "type": "core::bool",
+          "key": false
+        }
+      ],
+      "class_hash": "0x3ad527d907c24ed6d147d117b7edc75c3bae317f647dfbb7168e0ee6623a747",
+      "tag": "catacombs-NodeResolved",
+      "selector": "0x37ab50c68ec77a29b5714693a303b8fca83474d324d55cf621aa51344ccf81c"
     },
     {
       "members": [
@@ -1553,6 +1699,234 @@
       ]
     },
     {
+      "type": "struct",
+      "name": "catacombs::models::node::NodeOutcome",
+      "members": [
+        {
+          "name": "run_id",
+          "type": "core::integer::u64"
+        },
+        {
+          "name": "node_id",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "skill_tag",
+          "type": "core::felt252"
+        },
+        {
+          "name": "cat_stat",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "roll",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "difficulty",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "result",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "hp_delta",
+          "type": "core::integer::i8"
+        },
+        {
+          "name": "xp_gained",
+          "type": "core::integer::u16"
+        },
+        {
+          "name": "score_delta",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "cat_hp_after",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "cat_xp_after",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "leveled_up",
+          "type": "core::bool"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::node::NodeOutcomeValue",
+      "members": [
+        {
+          "name": "skill_tag",
+          "type": "core::felt252"
+        },
+        {
+          "name": "cat_stat",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "roll",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "difficulty",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "result",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "hp_delta",
+          "type": "core::integer::i8"
+        },
+        {
+          "name": "xp_gained",
+          "type": "core::integer::u16"
+        },
+        {
+          "name": "score_delta",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "cat_hp_after",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "cat_xp_after",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "leveled_up",
+          "type": "core::bool"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::node::NodeResolved",
+      "members": [
+        {
+          "name": "run_id",
+          "type": "core::integer::u64"
+        },
+        {
+          "name": "node_id",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "node_type",
+          "type": "catacombs::models::node::NodeType"
+        },
+        {
+          "name": "skill_tag",
+          "type": "core::felt252"
+        },
+        {
+          "name": "cat_stat",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "roll",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "difficulty",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "result",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "hp_delta",
+          "type": "core::integer::i8"
+        },
+        {
+          "name": "xp_gained",
+          "type": "core::integer::u16"
+        },
+        {
+          "name": "score_delta",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "cat_hp_after",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "cat_xp_after",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "leveled_up",
+          "type": "core::bool"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "catacombs::models::node::NodeResolvedValue",
+      "members": [
+        {
+          "name": "node_id",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "node_type",
+          "type": "catacombs::models::node::NodeType"
+        },
+        {
+          "name": "skill_tag",
+          "type": "core::felt252"
+        },
+        {
+          "name": "cat_stat",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "roll",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "difficulty",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "result",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "hp_delta",
+          "type": "core::integer::i8"
+        },
+        {
+          "name": "xp_gained",
+          "type": "core::integer::u16"
+        },
+        {
+          "name": "score_delta",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "cat_hp_after",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "cat_xp_after",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "leveled_up",
+          "type": "core::bool"
+        }
+      ]
+    },
+    {
       "type": "enum",
       "name": "catacombs::models::node::NodeType",
       "variants": [
@@ -1690,6 +2064,12 @@
     },
     {
       "type": "event",
+      "name": "catacombs::models::node::e_NodeResolved::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "event",
       "name": "catacombs::models::node::e_NodeVisited::Event",
       "kind": "enum",
       "variants": []
@@ -1703,6 +2083,12 @@
     {
       "type": "event",
       "name": "catacombs::models::node::m_Node::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "event",
+      "name": "catacombs::models::node::m_NodeOutcome::Event",
       "kind": "enum",
       "variants": []
     },
@@ -2288,6 +2674,26 @@
           "outputs": [
             {
               "type": "catacombs::models::node::Node"
+            }
+          ],
+          "state_mutability": "view"
+        },
+        {
+          "type": "function",
+          "name": "get_node_outcome",
+          "inputs": [
+            {
+              "name": "run_id",
+              "type": "core::integer::u64"
+            },
+            {
+              "name": "node_id",
+              "type": "core::integer::u8"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "catacombs::models::node::NodeOutcome"
             }
           ],
           "state_mutability": "view"
@@ -3524,92 +3930,6 @@
         {
           "name": "contract_address",
           "type": "core::starknet::contract_address::ContractAddress"
-        }
-      ]
-    },
-    {
-      "type": "interface",
-      "name": "dojo::world::iworld::IWorldTest",
-      "items": [
-        {
-          "type": "function",
-          "name": "set_entity_test",
-          "inputs": [
-            {
-              "name": "model_selector",
-              "type": "core::felt252"
-            },
-            {
-              "name": "index",
-              "type": "dojo::model::definition::ModelIndex"
-            },
-            {
-              "name": "values",
-              "type": "core::array::Span::<core::felt252>"
-            },
-            {
-              "name": "layout",
-              "type": "dojo::meta::layout::Layout"
-            }
-          ],
-          "outputs": [],
-          "state_mutability": "external"
-        },
-        {
-          "type": "function",
-          "name": "delete_entity_test",
-          "inputs": [
-            {
-              "name": "model_selector",
-              "type": "core::felt252"
-            },
-            {
-              "name": "index",
-              "type": "dojo::model::definition::ModelIndex"
-            },
-            {
-              "name": "layout",
-              "type": "dojo::meta::layout::Layout"
-            }
-          ],
-          "outputs": [],
-          "state_mutability": "external"
-        },
-        {
-          "type": "function",
-          "name": "emit_event_test",
-          "inputs": [
-            {
-              "name": "event_selector",
-              "type": "core::felt252"
-            },
-            {
-              "name": "keys",
-              "type": "core::array::Span::<core::felt252>"
-            },
-            {
-              "name": "values",
-              "type": "core::array::Span::<core::felt252>"
-            }
-          ],
-          "outputs": [],
-          "state_mutability": "external"
-        },
-        {
-          "type": "function",
-          "name": "dojo_contract_address",
-          "inputs": [
-            {
-              "name": "contract_selector",
-              "type": "core::felt252"
-            }
-          ],
-          "outputs": [
-            {
-              "type": "core::starknet::contract_address::ContractAddress"
-            }
-          ],
-          "state_mutability": "view"
         }
       ]
     },

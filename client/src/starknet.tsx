@@ -108,8 +108,7 @@ function createController(): Connector {
         },
         [EGS_ADAPTER_ADDRESS]: {
           methods: [
-            { name: "Mint Game", entrypoint: "mint_game", description: "Mint an EGS game token" },
-            { name: "Register Run", entrypoint: "register_run", description: "Link EGS token to a catacomb run" },
+            { name: "Mint & Register", entrypoint: "mint_and_register", description: "Mint an EGS game token and bind it to a run" },
           ],
         },
       },
