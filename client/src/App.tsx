@@ -8,7 +8,7 @@ import "./App.css";
 
 const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL ?? "";
 // Bump CAT_VIEWER_VERSION when rebuilding Godot, then upload to R2 under the new path
-const CAT_VIEWER_VERSION = "v2";
+const CAT_VIEWER_VERSION = "v3";
 const CAT_VIEWER_BASE = import.meta.env.DEV
   ? "/cat-viewer"
   : `https://pub-f5ae3b0da5d447b4b4f6a8cd2270c415.r2.dev/cat-viewer/${CAT_VIEWER_VERSION}`;
@@ -22,6 +22,29 @@ const SKILL_ICONS: Record<string, string> = {
   combat: "\u2694", stealth: "\u25C8", charm: "\u2661",
   agility: "\u2192", arcane: "\u2726", survival: "\u2618",
 };
+
+const HATS: { id: string; name: string; icon: string }[] = [
+  { id: "none", name: "None", icon: "\u2014" },
+  { id: "gentleman_hat", name: "Gentleman", icon: "\uD83C\uDFA9" },
+  { id: "irish_hat", name: "Irish", icon: "\u2618" },
+  { id: "monk_hat", name: "Monk", icon: "\u2638" },
+  { id: "pirate_hat", name: "Pirate", icon: "\u2620" },
+  { id: "pope_hat", name: "Pope", icon: "\u2720" },
+  { id: "viking_helmet", name: "Viking", icon: "\u2694" },
+  { id: "winter_hat", name: "Winter", icon: "\u2744" },
+  { id: "wizard_hat", name: "Wizard", icon: "\u2605" },
+];
+
+const WEAPONS: { id: string; name: string; icon: string }[] = [
+  { id: "none", name: "Unarmed", icon: "\u270A" },
+  { id: "sword", name: "Sword", icon: "\u2694" },
+  { id: "gun", name: "Gun", icon: "\u25C8" },
+  { id: "sword_one_handed", name: "Sword 1H", icon: "\u2191" },
+  { id: "sword_two_handed", name: "Sword 2H", icon: "\u2195" },
+  { id: "axe_one_handed", name: "Axe 1H", icon: "\u2020" },
+  { id: "axe_two_handed", name: "Axe 2H", icon: "\u2021" },
+  { id: "hammer_two_handed", name: "Hammer", icon: "\u2692" },
+];
 
 interface Toast {
   id: number;
@@ -240,6 +263,8 @@ function App() {
   const [runLog, setRunLog] = useState<RunLogEntry[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [defeat, setDefeat] = useState<{ score: number; nodesVisited: number; status: string } | null>(null);
+  const [selectedHat, setSelectedHat] = useState<string>("none");
+  const [selectedWeapon, setSelectedWeapon] = useState<string>("none");
   const txIdRef = useRef(1);
 
   const selectedEntry = cats.find(e => e.cat.id === selectedCatId);
@@ -638,7 +663,8 @@ function App() {
   const currentNode = nodes.find(n => n.node_id === run?.current_node_id);
   const currentNodeType = currentNode ? NODE_TYPES[currentNode.node_type] : undefined;
   const catAnimation = connected
-    ? (tab === "cats" ? catIdleAnim
+    ? (tab === "cats"
+      ? (selectedWeapon !== "none" ? "Sword_Idle" : catIdleAnim)
       : defeat ? (defeat.status === "Completed" ? VICTORY_ANIM : DEFEAT_ANIM)
       : getCatAnimation(run, currentNodeType, pending))
     : connectDance;
@@ -646,7 +672,7 @@ function App() {
     ? (defeat ? "cozy_fireplace" : getCatScene(currentNodeType))
     : "default_studio";
   const viewerSlotClass = connected
-    ? `cat-viewer-slot slot-${tab}${tab === "cats" && creating ? " slot-creating" : ""}`
+    ? `cat-viewer-slot slot-${tab}`
     : "cat-viewer-slot slot-connect";
 
   // Show the cat's on-chain appearance in the viewer (creator overrides when active)
@@ -673,6 +699,8 @@ function App() {
           scene={catScene}
           autoRotate={!connected}
           appearance={viewerAppearance}
+          hat={connected && tab === "cats" ? selectedHat : undefined}
+          weapon={connected && tab === "cats" ? selectedWeapon : undefined}
           camera={!connected ? { distance: 1.24, yaw: 4.2, pitch: -1.4 } : undefined}
           cameraTarget={!connected ? { x: 0, y: 0.264, z: 0 } : undefined}
         />
@@ -766,35 +794,75 @@ function App() {
 
               {/* Selected Cat Details */}
               {cat ? (
-                <div className="card">
-                  <h3 className="card-title">Cat #{cat.id}</h3>
-                  <div className="stats-grid">
-                    <StatCell label="Level" value={cat.level} accent />
-                    <StatCell label="XP" value={cat.xp} />
-                    <StatCell label="HP" value={`${cat.hp}/${cat.max_hp}`}
-                      hpLevel={cat.hp / cat.max_hp} />
-                    <StatCell label="ATK" value={cat.attack} />
-                    <StatCell label="DEF" value={cat.defense} />
-                    <StatCell label="SPD" value={cat.speed} />
-                    <StatCell label="LCK" value={cat.luck} />
-                    <StatCell label="Status" value={cat.alive ? "Alive" : "Wounded"}
-                      hpLevel={cat.alive ? 1 : 0} />
+                <>
+                <div className="card cat-compact-card">
+                  <div className="cat-compact-header">
+                    <span className="cat-compact-name">Cat #{cat.id}</span>
+                    <span className="cat-compact-level">Lv.{cat.level}</span>
+                    <span className="cat-compact-xp">{cat.xp} XP</span>
+                    <span className={`cat-compact-status ${cat.alive ? "" : "wounded"}`}>
+                      {cat.alive ? "\u2665" : "\u2620"}
+                    </span>
                   </div>
-                  <div className="hp-bar-container">
-                    <div className="hp-bar-track">
+                  <div className="cat-compact-hp">
+                    <div className="cat-compact-hp-track">
                       <div
-                        className={`hp-bar-fill ${
+                        className={`cat-compact-hp-fill ${
                           cat.hp / cat.max_hp > 0.66 ? 'high' :
                           cat.hp / cat.max_hp > 0.33 ? 'mid' : 'low'
                         }`}
                         style={{ width: `${(cat.hp / cat.max_hp) * 100}%` }}
                       />
                     </div>
+                    <span className="cat-compact-hp-text">{cat.hp}/{cat.max_hp}</span>
                   </div>
-                  <div className="runs-meta">
-                    {cat.runs_completed} completed / {cat.runs_failed} failed
+                  <div className="cat-compact-stats">
+                    <span className="cat-compact-stat"><span className="stat-icon atk">{"\u2694"}</span>{cat.attack}</span>
+                    <span className="cat-compact-stat"><span className="stat-icon def">{"\u25C6"}</span>{cat.defense}</span>
+                    <span className="cat-compact-stat"><span className="stat-icon spd">{"\u2192"}</span>{cat.speed}</span>
+                    <span className="cat-compact-stat"><span className="stat-icon lck">{"\u2618"}</span>{cat.luck}</span>
+                    <span className="cat-compact-runs">{cat.runs_completed}W / {cat.runs_failed}L</span>
                   </div>
                 </div>
+
+                {/* Equipment */}
+                <div className="card equip-card">
+                  <div className="equip-header">
+                    <h3 className="card-title" style={{ margin: 0 }}>Equipment</h3>
+                    <span className="equip-badge">COMING SOON</span>
+                  </div>
+                  <div className="equip-row">
+                    <span className="equip-row-label">Headgear</span>
+                    <div className="equip-scroll">
+                      {HATS.map(h => (
+                        <button
+                          key={h.id}
+                          className={`equip-tile ${selectedHat === h.id ? "selected" : ""}`}
+                          onClick={() => setSelectedHat(h.id)}
+                        >
+                          <span className="equip-tile-icon">{h.icon}</span>
+                          <span className="equip-tile-name">{h.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="equip-row">
+                    <span className="equip-row-label">Weapon</span>
+                    <div className="equip-scroll">
+                      {WEAPONS.map(w => (
+                        <button
+                          key={w.id}
+                          className={`equip-tile ${selectedWeapon === w.id ? "selected" : ""}`}
+                          onClick={() => setSelectedWeapon(w.id)}
+                        >
+                          <span className="equip-tile-icon">{w.icon}</span>
+                          <span className="equip-tile-name">{w.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                </>
               ) : (
                 <div className="card">
                   <h3 className="card-title">No Cats Yet</h3>
@@ -1120,11 +1188,13 @@ function getCatScene(currentNodeType: string | undefined): string {
   }
 }
 
-function CatViewer({ animation, scene, autoRotate = false, appearance, camera, cameraTarget }: {
+function CatViewer({ animation, scene, autoRotate = false, appearance, hat, weapon, camera, cameraTarget }: {
   animation: string;
   scene: string;
   autoRotate?: boolean;
   appearance?: Record<string, any> | null;
+  hat?: string;
+  weapon?: string;
   camera?: { distance: number; yaw: number; pitch: number };
   cameraTarget?: { x: number; y: number; z: number };
 }) {
@@ -1184,6 +1254,18 @@ function CatViewer({ animation, scene, autoRotate = false, appearance, camera, c
       "*"
     );
   }, [appearance]);
+
+  // Send hat/weapon changes
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    const config: Record<string, any> = {};
+    if (hat != null) config.hat = hat;
+    if (weapon != null) config.weapon = weapon;
+    if (Object.keys(config).length > 0) {
+      iframe.contentWindow.postMessage({ type: "catViewer:configure", config }, "*");
+    }
+  }, [hat, weapon]);
 
   const src = useMemo(
     () => `${CAT_VIEWER_BASE}/embed.html?scene=${encodeURIComponent(scene)}&animation=${encodeURIComponent(animation)}&autoRotate=${autoRotate}&camDist=1.24&camY=4.2&camX=-1.4&camTargetY=0.264`,

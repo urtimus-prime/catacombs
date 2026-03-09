@@ -289,17 +289,13 @@ body::after {
   display: block;
 }
 
-/* Cats tab: large viewer */
+/* Cats tab: compact viewer */
 .cat-viewer-slot.slot-cats iframe {
-  aspect-ratio: 4 / 5;
-  max-height: 480px;
-}
-
-/* Cats tab during creation: shorter viewer to fit controls */
-.cat-viewer-slot.slot-creating iframe {
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
   max-height: 320px;
 }
+
+/* Cats tab during creation: same size as normal cats view */
 
 /* Catacombs tab: compact viewer */
 .cat-viewer-slot.slot-catacombs iframe {
@@ -419,6 +415,112 @@ body::after {
 .runs-meta .wounded {
   color: var(--blood-400);
   font-weight: 500;
+}
+
+/* ===== COMPACT CAT CARD ===== */
+
+.cat-compact-card {
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+
+.cat-compact-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cat-compact-name {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--stone-200);
+}
+
+.cat-compact-level {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--amber-400);
+}
+
+.cat-compact-xp {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--stone-500);
+}
+
+.cat-compact-status {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--venom-400);
+}
+
+.cat-compact-status.wounded {
+  color: var(--blood-400);
+}
+
+.cat-compact-hp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cat-compact-hp-track {
+  flex: 1;
+  height: 4px;
+  background: var(--stone-800);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.cat-compact-hp-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.cat-compact-hp-fill.high { background: linear-gradient(90deg, var(--venom-700), var(--venom-500)); }
+.cat-compact-hp-fill.mid { background: linear-gradient(90deg, var(--amber-700), var(--amber-500)); }
+.cat-compact-hp-fill.low { background: linear-gradient(90deg, var(--blood-700), var(--blood-500)); }
+
+.cat-compact-hp-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--stone-400);
+  min-width: 40px;
+  text-align: right;
+}
+
+.cat-compact-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cat-compact-stat {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--stone-300);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cat-compact-stat .stat-icon {
+  font-size: 10px;
+}
+
+.cat-compact-runs {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--stone-500);
+  letter-spacing: 0.05em;
 }
 
 /* ===== EMPTY STATE ===== */
@@ -945,10 +1047,10 @@ body::after {
 
 .cat-roster {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 4px 0 16px;
+  padding: 4px 0 8px;
   scrollbar-width: none;
 }
 
@@ -1127,7 +1229,7 @@ body::after {
 .creator-sliders {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px 16px;
+  gap: 10px 16px;
   margin-bottom: 14px;
 }
 
@@ -1135,6 +1237,7 @@ body::after {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 2px 0;
 }
 
 .creator-slider-label {
@@ -1150,18 +1253,19 @@ body::after {
 
 .creator-slider {
   flex: 1;
-  height: 3px;
+  height: 5px;
   -webkit-appearance: none;
   appearance: none;
   background: var(--stone-700);
+  border-radius: 3px;
   outline: none;
   cursor: pointer;
 }
 
 .creator-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--amber-400);
   border: 2px solid var(--stone-900);
@@ -1169,8 +1273,8 @@ body::after {
 }
 
 .creator-slider::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--amber-400);
   border: 2px solid var(--stone-900);
@@ -1189,6 +1293,118 @@ body::after {
 
 .creator-cancel {
   flex: 1;
+}
+
+/* ===== EQUIPMENT PANEL ===== */
+
+.equip-card {
+  padding: 10px 14px 8px;
+  margin-bottom: 8px;
+}
+
+.equip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.equip-badge {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--stone-900);
+  background: var(--amber-400);
+  padding: 2px 8px;
+  border-radius: 2px;
+  line-height: 1.4;
+}
+
+.equip-row {
+  margin-bottom: 6px;
+}
+
+.equip-row:last-child {
+  margin-bottom: 0;
+}
+
+.equip-row-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--stone-500);
+  margin-bottom: 4px;
+}
+
+.equip-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stone-700) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.equip-scroll::-webkit-scrollbar {
+  height: 3px;
+}
+
+.equip-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.equip-scroll::-webkit-scrollbar-thumb {
+  background: var(--stone-700);
+  border-radius: 2px;
+}
+
+.equip-tile {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 48px;
+  padding: 5px 3px 4px;
+  background: var(--stone-800);
+  border: 1px solid var(--stone-700);
+  color: var(--stone-400);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.equip-tile:hover {
+  border-color: var(--stone-500);
+  color: var(--stone-200);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.equip-tile.selected {
+  border-color: var(--amber-500);
+  color: var(--amber-400);
+  background: rgba(245, 158, 11, 0.08);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.15);
+}
+
+.equip-tile-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.equip-tile-name {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 /* ===== PLAYER TAB ===== */
@@ -1333,13 +1549,8 @@ body::after {
 
   /* Cat viewer slot on mobile */
   .cat-viewer-slot.slot-cats iframe {
-    aspect-ratio: 1 / 1;
-    max-height: 320px;
-  }
-
-  .cat-viewer-slot.slot-creating iframe {
-    aspect-ratio: 16 / 9;
-    max-height: 220px;
+    aspect-ratio: 4 / 3;
+    max-height: 240px;
   }
 
   .cat-viewer-slot.slot-catacombs iframe {
@@ -1466,11 +1677,38 @@ body::after {
   }
 
   .creator-sliders {
-    gap: 4px 10px;
+    gap: 8px 12px;
   }
 
   .creator-actions .btn {
     padding: 10px 12px;
+  }
+
+  /* Equipment */
+  .equip-card {
+    padding: 8px 10px 6px;
+  }
+
+  .equip-tile {
+    width: 44px;
+    padding: 4px 2px 3px;
+  }
+
+  .equip-tile-icon {
+    font-size: 12px;
+  }
+
+  .equip-tile-name {
+    font-size: 6px;
+  }
+
+  /* Compact cat card */
+  .cat-compact-card {
+    padding: 8px 10px;
+  }
+
+  .cat-compact-stat {
+    font-size: 10px;
   }
 
   /* Toasts */
