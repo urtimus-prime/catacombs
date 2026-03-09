@@ -9,7 +9,7 @@ import {
 } from "@starknet-react/core";
 import { Account, RpcProvider, constants } from "starknet";
 import ControllerConnector from "@cartridge/connector/controller";
-import { RPC_URL } from "./dojo/config";
+import { RPC_URL, EGS_ADAPTER_ADDRESS } from "./dojo/config";
 import { dojoConfig } from "./dojo/config";
 
 const CHAIN = import.meta.env.VITE_CHAIN ?? "katana";
@@ -104,6 +104,12 @@ function createController(): Connector {
         [shinyAddr]: {
           methods: [
             { name: "Buy Shinies", entrypoint: "buy_shinies", description: "Buy SHINIES with STRK" },
+          ],
+        },
+        [EGS_ADAPTER_ADDRESS]: {
+          methods: [
+            { name: "Mint Game", entrypoint: "mint_game", description: "Mint an EGS game token" },
+            { name: "Register Run", entrypoint: "register_run", description: "Link EGS token to a catacomb run" },
           ],
         },
       },

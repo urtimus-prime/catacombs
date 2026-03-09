@@ -1,7 +1,7 @@
 import type { DojoProvider } from "@dojoengine/core";
 import type { Account, AccountInterface } from "starknet";
 import { RpcProvider, CallData } from "starknet";
-import { RPC_URL } from "./config";
+import { RPC_URL, EGS_ADAPTER_ADDRESS } from "./config";
 
 // STRK token address (same on Katana, Sepolia, Mainnet)
 export const STRK_ADDRESS = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
@@ -138,5 +138,57 @@ export function setupWorld(provider: DojoProvider) {
     },
   };
 
-  return { cat_actions, run_actions, encounter_actions, shiny_actions };
+  // EGS adapter — standalone contract (not a Dojo system)
+  const egs_adapter = {
+    // Mint a game token on the adapter (calls MinigameComponent.mint_game)
+    // Returns the packed token_id as felt252
+    mint_game: async (account: Account | AccountInterface, playerAddress: string) => {
+      return await account.execute([
+        {
+          contractAddress: EGS_ADAPTER_ADDRESS,
+          entrypoint: "mint_game",
+          calldata: CallData.compile({
+            // Option::None for most params, player address as `to`, not soulbound, no paymaster
+            player_name: { variant: { None: {} } },      // Option<felt252>
+            settings_id: { variant: { None: {} } },       // Option<u32>
+            start: { variant: { None: {} } },             // Option<u64>
+            end: { variant: { None: {} } },               // Option<u64>
+            objective_id: { variant: { None: {} } },      // Option<u32>
+            context: { variant: { None: {} } },           // Option<GameContextDetails>
+            client_url: { variant: { None: {} } },        // Option<ByteArray>
+            renderer_address: { variant: { None: {} } },  // Option<ContractAddress>
+            skills_address: { variant: { None: {} } },    // Option<ContractAddress>
+            to: playerAddress,
+            soulbound: false,
+            paymaster: false,
+            salt: Math.floor(Math.random() * 65535),      // u16 random salt
+            metadata: 0,                                   // u16
+          }),
+        },
+      ]);
+    },
+
+    // Bind an EGS token to a Catacombs run
+    register_run: async (account: Account | AccountInterface, tokenId: string, runId: number) => {
+      return await account.execute([
+        {
+          contractAddress: EGS_ADAPTER_ADDRESS,
+          entrypoint: "register_run",
+          calldata: [tokenId, String(runId)],
+        },
+      ]);
+    },
+
+    // Read: get run_id for a token
+    get_run_for_token: async (tokenId: string) => {
+      return await rawCall(EGS_ADAPTER_ADDRESS, "get_run_for_token", [tokenId]);
+    },
+
+    // Read: get token_id for a run
+    get_token_for_run: async (runId: number) => {
+      return await rawCall(EGS_ADAPTER_ADDRESS, "get_token_for_run", [String(runId)]);
+    },
+  };
+
+  return { cat_actions, run_actions, encounter_actions, shiny_actions, egs_adapter };
 }

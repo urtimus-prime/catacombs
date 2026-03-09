@@ -13,3 +13,12 @@ export const TORII_URL =
 const manifest = CHAIN === "sepolia" || CHAIN === "mainnet" ? manifest_sepolia : manifest_dev;
 
 export const dojoConfig = createDojoConfig({ manifest, rpcUrl: RPC_URL, toriiUrl: TORII_URL });
+
+// EGS (Embeddable Game Standard) contract addresses — Sepolia only for now
+export const EGS_ADAPTER_ADDRESS =
+  import.meta.env.VITE_EGS_ADAPTER_ADDRESS ??
+  "0x03ec46e70e65dfd5728d1198b6fc345a0a72a561a394919efbf455672bdd46cd";
+
+export const DENSHOKAN_TOKEN_ADDRESS =
+  import.meta.env.VITE_DENSHOKAN_TOKEN_ADDRESS ??
+  "0x0142712722e62a38f9c40fcc904610e1a14c70125876ecaaf25d803556734467";

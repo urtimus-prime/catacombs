@@ -3,7 +3,7 @@ import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
 import { useDojoSDK } from "@dojoengine/sdk/react";
 import { RpcProvider } from "starknet";
 import { NODE_TYPES, RUN_STATUS } from "./dojo/models";
-import { RPC_URL } from "./dojo/config";
+import { RPC_URL, CHAIN } from "./dojo/config";
 import "./App.css";
 
 const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL ?? "";
@@ -438,6 +438,44 @@ function App() {
         );
         if (found && found > 0) {
           await fetchRun(found);
+          // EGS: mint game token and bind it to this run (Sepolia/Mainnet only)
+          if (CHAIN === "sepolia" || CHAIN === "mainnet") {
+            try {
+              addToast("Minting EGS token...", "info");
+              const mintResult = await client.egs_adapter.mint_game(account!, address!);
+              if (mintResult?.transaction_hash) {
+                const receipt = await rpcProvider.waitForTransaction(
+                  mintResult.transaction_hash, { retryInterval: 500 },
+                ) as any;
+                // Extract token_id from Transfer event (ERC721: from=0, to=player, token_id)
+                // Transfer event key[0] is the event selector, data contains [from, to, token_id_low, token_id_high]
+                // or for felt252 token: [from, to, token_id]
+                const transferEvents = (receipt.events ?? []).filter((e: any) =>
+                  e.keys?.[0] === "0x99cd8bde557814842a3121e8ddfd433a539b8c9f14bf31ebf108d12e6196e9" // Transfer selector
+                );
+                if (transferEvents.length > 0) {
+                  const ev = transferEvents[transferEvents.length - 1];
+                  // ERC721 Transfer: keys=[selector, from, to], data=[token_id_low, token_id_high]
+                  const tokenId = ev.data?.[0] ?? ev.keys?.[3];
+                  if (tokenId && tokenId !== "0x0") {
+                    addToast("Linking EGS token to run...", "info");
+                    const regResult = await client.egs_adapter.register_run(account!, tokenId, found);
+                    if (regResult?.transaction_hash) {
+                      await rpcProvider.waitForTransaction(regResult.transaction_hash, { retryInterval: 500 });
+                    }
+                    addToast("EGS token linked", "success");
+                  } else {
+                    addToast("EGS token minted (no binding)", "info");
+                  }
+                } else {
+                  addToast("EGS token minted", "success");
+                }
+              }
+            } catch (e: any) {
+              // Non-fatal: run works fine without EGS binding
+              addToast("EGS: " + (e.message?.slice(0, 60) ?? String(e).slice(0, 60)), "info");
+            }
+          }
         }
       },
     );
