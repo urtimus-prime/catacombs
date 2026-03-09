@@ -1,0 +1,16 @@
+[package]
+name = "catacombs_egs"
+version = "0.1.0"
+cairo-version = "2.16.0"
+edition = "2024_07"
+
+[cairo]
+sierra-replace-ids = true
+
+[dependencies]
+starknet = "2.16.0"
+game_components_embeddable_game_standard = { git = "https://github.com/Provable-Games/game-components", tag = "v1.1.0" }
+game_components_interfaces = { git = "https://github.com/Provable-Games/game-components", tag = "v1.1.0" }
+openzeppelin_introspection = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v3.0.0" }
+
+[[target.starknet-contract]]
