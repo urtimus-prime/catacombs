@@ -670,7 +670,9 @@ function App() {
       : getCatAnimation(run, currentNodeType, currentSkillTag, pending))
     : connectDance;
   const catScene = connected
-    ? (defeat ? "cozy_fireplace" : getCatScene(currentNodeType, currentSkillTag))
+    ? (tab === "cats" ? "default_studio"
+      : defeat ? "cozy_fireplace"
+      : getCatScene(currentNodeType, currentSkillTag))
     : "default_studio";
   const viewerSlotClass = connected
     ? `cat-viewer-slot slot-${tab}`
