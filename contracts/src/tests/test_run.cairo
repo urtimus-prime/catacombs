@@ -123,6 +123,32 @@ mod tests {
         (ctx, cat_id, run_id)
     }
 
+    /// Helper: find a connected node from current node
+    fn find_connected_node(ctx: @TestContext, run_id: u64, from_node_id: u8) -> u8 {
+        let node: Node = (*ctx.world).read_model((run_id, from_node_id));
+        let connections = node.connections;
+        // Find the lowest set bit
+        let mut i: u8 = 0;
+        loop {
+            if i >= 26 {
+                break 0_u8;
+            }
+            let mut mask: u32 = 1;
+            let mut j: u8 = 0;
+            loop {
+                if j >= i {
+                    break;
+                }
+                mask = mask * 2;
+                j += 1;
+            };
+            if connections & mask != 0 {
+                break i;
+            }
+            i += 1;
+        }
+    }
+
     // ==================== Run Tests ====================
 
     #[test]
@@ -136,47 +162,58 @@ mod tests {
         let run: Run = ctx.world.read_model(run_id);
         assert!(run.cat_id == cat_id, "run cat_id should match");
         assert!(run.current_node_id == 0, "should start at node 0");
-        assert!(run.floor == 1, "should start at floor 1");
-        assert!(run.max_floors == 3, "should have 3 floors");
         assert!(run.status == RunStatus::Active, "should be active");
         assert!(run.score == 0, "score should be 0");
         assert!(run.seed != 0, "seed should not be zero");
-    }
-
-    #[test]
-    fn test_map_generation() {
-        let (ctx, _cat_id, run_id) = setup_with_run();
 
         // Node 0 should be Start
         let node0: Node = ctx.world.read_model((run_id, 0_u8));
         assert!(node0.node_type == NodeType::Start, "node 0 should be Start");
-        assert!(node0.floor == 1, "node 0 should be floor 1");
-        // Start connects to nodes 1 and 2 (bits 1 and 2 set = 0b110 = 6)
-        assert!(node0.connections == 6, "start should connect to 1,2");
+        assert!(node0.column == 0, "node 0 should be column 0");
 
-        // Node 6 should be Boss
-        let node6: Node = ctx.world.read_model((run_id, 6_u8));
-        assert!(node6.node_type == NodeType::Boss, "node 6 should be Boss");
-        assert!(node6.connections == 0, "boss should have no outgoing connections");
+        // Node 25 should be Boss
+        let node25: Node = ctx.world.read_model((run_id, 25_u8));
+        assert!(node25.node_type == NodeType::Boss, "node 25 should be Boss");
+        assert!(node25.column == 9, "node 25 should be column 9");
 
-        // Middle nodes should exist and have connections
-        let node1: Node = ctx.world.read_model((run_id, 1_u8));
-        assert!(node1.connections != 0, "node 1 should have connections");
-        assert!(node1.floor == 1, "node 1 should be floor 1");
+        // node_count should be reasonable (10 cols: 1 + 8*[1-3] + 1 = min 10, max 26)
+        assert!(run.node_count >= 10, "node_count should be at least 10");
+        assert!(run.node_count <= 26, "node_count should be at most 26");
+    }
 
-        let node2: Node = ctx.world.read_model((run_id, 2_u8));
-        assert!(node2.connections != 0, "node 2 should have connections");
+    #[test]
+    fn test_map_connectivity() {
+        let (ctx, _cat_id, run_id) = setup_with_run();
+
+        // Start node should have connections
+        let node0: Node = ctx.world.read_model((run_id, 0_u8));
+        assert!(node0.connections != 0, "start should have connections");
+
+        // Boss node should have no outgoing connections
+        let node25: Node = ctx.world.read_model((run_id, 25_u8));
+        assert!(node25.connections == 0, "boss should have no outgoing connections");
+
+        // Every connected node should exist with a valid type
+        // Check that we can reach at least one node from start
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        assert!(first_target > 0, "start should connect to a middle node");
+        assert!(first_target <= 3, "start should connect to col 1 (nodes 1-3)");
+
+        let target_node: Node = ctx.world.read_model((run_id, first_target));
+        assert!(target_node.column == 1, "first target should be in column 1");
     }
 
     #[test]
     fn test_choose_path() {
         let (ctx, _cat_id, run_id) = setup_with_run();
 
-        // From start (0), can go to node 1 or 2
-        ctx.run_actions.choose_path(run_id, 1);
+        // Find a valid first move from start
+        let first_target = find_connected_node(@ctx, run_id, 0);
+
+        ctx.run_actions.choose_path(run_id, first_target);
 
         let run: Run = ctx.world.read_model(run_id);
-        assert!(run.current_node_id == 1, "should be at node 1");
+        assert!(run.current_node_id == first_target, "should be at chosen node");
         assert!(run.nodes_visited == 1, "should have visited 1 node");
     }
 
@@ -184,12 +221,15 @@ mod tests {
     fn test_choose_path_forward() {
         let (ctx, _cat_id, run_id) = setup_with_run();
 
-        // Start -> 1 -> 3 (nodes 1-2 connect to 3-4)
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.run_actions.choose_path(run_id, 3);
+        // Navigate two steps forward
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+
+        let second_target = find_connected_node(@ctx, run_id, first_target);
+        ctx.run_actions.choose_path(run_id, second_target);
 
         let run: Run = ctx.world.read_model(run_id);
-        assert!(run.current_node_id == 3, "should be at node 3");
+        assert!(run.current_node_id == second_target, "should be at second node");
         assert!(run.nodes_visited == 2, "should have visited 2 nodes");
     }
 
@@ -197,8 +237,8 @@ mod tests {
     #[should_panic(expected: "no path to that node")]
     fn test_choose_invalid_path_panics() {
         let (ctx, _cat_id, run_id) = setup_with_run();
-        // From start (0), cannot go directly to node 6 (boss)
-        ctx.run_actions.choose_path(run_id, 6);
+        // From start (0), cannot go directly to node 25 (boss)
+        ctx.run_actions.choose_path(run_id, 25);
     }
 
     #[test]
@@ -208,7 +248,8 @@ mod tests {
         let other: ContractAddress = OTHER.try_into().unwrap();
         let (run_addr, _) = ctx.world.dns(@"run_actions").unwrap();
         start_cheat_caller_address(run_addr, other);
-        ctx.run_actions.choose_path(run_id, 1);
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
     }
 
     #[test]
@@ -253,12 +294,13 @@ mod tests {
         let (ctx, _cat_id, run_id) = setup_with_run();
         let scenario_hash: felt252 = 'a_dark_tunnel_appears';
 
-        // Move to node 1 first
-        ctx.run_actions.choose_path(run_id, 1);
+        // Move to first connected node
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
 
-        ctx.encounter_actions.submit_scenario(run_id, 1, scenario_hash);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, scenario_hash);
 
-        let enc: Encounter = ctx.world.read_model((run_id, 1_u8));
+        let enc: Encounter = ctx.world.read_model((run_id, first_target));
         assert!(enc.scenario_hash == scenario_hash, "scenario hash should match");
         assert!(enc.result == EncounterResult::Pending, "should be pending");
     }
@@ -275,13 +317,14 @@ mod tests {
     fn test_resolve_encounter_success() {
         let (ctx, cat_id, run_id) = setup_with_run();
 
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'dark_tunnel');
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, 'dark_tunnel');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'stealth_skill', EncounterResult::Success, 0, 25, 0,
+            run_id, first_target, 'stealth_skill', EncounterResult::Success, 0, 25, 0,
         );
 
-        let enc: Encounter = ctx.world.read_model((run_id, 1_u8));
+        let enc: Encounter = ctx.world.read_model((run_id, first_target));
         assert!(enc.result == EncounterResult::Success, "should be success");
         assert!(enc.skill_hash == 'stealth_skill', "skill hash should match");
         assert!(enc.xp_gained == 25, "xp gained should be 25");
@@ -290,7 +333,7 @@ mod tests {
         assert!(cat.xp == 25, "cat xp should be 25");
         assert!(cat.hp == 100, "cat hp should be unchanged");
 
-        let node: Node = ctx.world.read_model((run_id, 1_u8));
+        let node: Node = ctx.world.read_model((run_id, first_target));
         assert!(node.resolved, "node should be resolved");
     }
 
@@ -298,10 +341,11 @@ mod tests {
     fn test_resolve_encounter_partial() {
         let (ctx, cat_id, run_id) = setup_with_run();
 
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'rat_ambush');
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, 'rat_ambush');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'combat_skill', EncounterResult::Partial, -15, 10, 0,
+            run_id, first_target, 'combat_skill', EncounterResult::Partial, -15, 10, 0,
         );
 
         let cat: Cat = ctx.world.read_model(cat_id);
@@ -313,10 +357,11 @@ mod tests {
     fn test_resolve_encounter_failure() {
         let (ctx, cat_id, run_id) = setup_with_run();
 
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'spike_trap');
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, 'spike_trap');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'wrong_skill', EncounterResult::Failure, -30, 0, 0,
+            run_id, first_target, 'wrong_skill', EncounterResult::Failure, -30, 0, 0,
         );
 
         let cat: Cat = ctx.world.read_model(cat_id);
@@ -333,10 +378,11 @@ mod tests {
         cat.hp = 10;
         ctx.world.write_model_test(@cat);
 
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'boss_attack');
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, 'boss_attack');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'skill', EncounterResult::Failure, -50, 0, 0,
+            run_id, first_target, 'skill', EncounterResult::Failure, -50, 0, 0,
         );
 
         let cat: Cat = ctx.world.read_model(cat_id);
@@ -351,13 +397,14 @@ mod tests {
     fn test_resolve_encounter_with_loot() {
         let (ctx, cat_id, run_id) = setup_with_run();
 
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'treasure_chest');
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, 'treasure_chest');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'lockpick', EncounterResult::Success, 0, 15, 1,
+            run_id, first_target, 'lockpick', EncounterResult::Success, 0, 15, 1,
         );
 
-        let enc: Encounter = ctx.world.read_model((run_id, 1_u8));
+        let enc: Encounter = ctx.world.read_model((run_id, first_target));
         assert!(enc.loot_id == 1, "loot_id should be 1");
 
         // Check item was created
@@ -375,10 +422,11 @@ mod tests {
         cat.hp = 60;
         ctx.world.write_model_test(@cat);
 
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'rest_site');
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, 'rest_site');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'rest', EncounterResult::Success, 20, 5, 0,
+            run_id, first_target, 'rest', EncounterResult::Success, 20, 5, 0,
         );
 
         let cat: Cat = ctx.world.read_model(cat_id);
@@ -394,10 +442,11 @@ mod tests {
         cat.hp = 95;
         ctx.world.write_model_test(@cat);
 
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'fountain');
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, 'fountain');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'drink', EncounterResult::Success, 20, 5, 0,
+            run_id, first_target, 'drink', EncounterResult::Success, 20, 5, 0,
         );
 
         let cat: Cat = ctx.world.read_model(cat_id);
@@ -419,10 +468,11 @@ mod tests {
         cat.xp = 90;
         ctx.world.write_model_test(@cat);
 
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'easy_fight');
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, 'easy_fight');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'slash', EncounterResult::Success, 0, 15, 0,
+            run_id, first_target, 'slash', EncounterResult::Success, 0, 15, 0,
         );
 
         let cat: Cat = ctx.world.read_model(cat_id);
@@ -438,48 +488,63 @@ mod tests {
     fn test_resolve_twice_panics() {
         let (ctx, _cat_id, run_id) = setup_with_run();
 
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'fight');
+        let first_target = find_connected_node(@ctx, run_id, 0);
+        ctx.run_actions.choose_path(run_id, first_target);
+        ctx.encounter_actions.submit_scenario(run_id, first_target, 'fight');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'skill', EncounterResult::Success, 0, 10, 0,
+            run_id, first_target, 'skill', EncounterResult::Success, 0, 10, 0,
         );
         ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'skill', EncounterResult::Success, 0, 10, 0,
+            run_id, first_target, 'skill', EncounterResult::Success, 0, 10, 0,
         );
     }
 
     #[test]
-    fn test_full_path_through_floor() {
-        let (ctx, _cat_id, run_id) = setup_with_run();
+    fn test_full_run_to_boss() {
+        let (ctx, cat_id, run_id) = setup_with_run();
 
-        // Start(0) -> 1 -> 3 -> 5 -> Boss(6)
-        ctx.run_actions.choose_path(run_id, 1);
-        ctx.encounter_actions.submit_scenario(run_id, 1, 'enc1');
-        ctx.encounter_actions.resolve_encounter(
-            run_id, 1, 'skill', EncounterResult::Success, 0, 10, 0,
-        );
+        // Traverse the map from start to boss by following connections
+        let mut current: u8 = 0;
+        let mut steps: u8 = 0;
 
-        ctx.run_actions.choose_path(run_id, 3);
-        ctx.encounter_actions.submit_scenario(run_id, 3, 'enc2');
-        ctx.encounter_actions.resolve_encounter(
-            run_id, 3, 'skill', EncounterResult::Success, 0, 10, 0,
-        );
+        loop {
+            // Find next connected node
+            let next = find_connected_node(@ctx, run_id, current);
+            assert!(next > current, "should always move forward");
 
-        ctx.run_actions.choose_path(run_id, 5);
-        ctx.encounter_actions.submit_scenario(run_id, 5, 'enc3');
-        ctx.encounter_actions.resolve_encounter(
-            run_id, 5, 'skill', EncounterResult::Success, 0, 10, 0,
-        );
+            ctx.run_actions.choose_path(run_id, next);
 
-        ctx.run_actions.choose_path(run_id, 6);
-        ctx.encounter_actions.submit_scenario(run_id, 6, 'boss_fight');
+            // Check if we reached the boss
+            let next_node: Node = ctx.world.read_model((run_id, next));
+            if next_node.node_type == NodeType::Boss {
+                current = next;
+                break;
+            }
+
+            // Resolve encounter at this non-boss node
+            ctx.encounter_actions.submit_scenario(run_id, next, 'encounter');
+            ctx.encounter_actions.resolve_encounter(
+                run_id, next, 'skill', EncounterResult::Success, 0, 10, 0,
+            );
+
+            current = next;
+            steps += 1;
+
+            // Safety: should never take more than 9 steps (cols 1-9)
+            assert!(steps <= 9, "too many steps");
+        };
+
+        // Now at boss node, resolve boss encounter
+        ctx.encounter_actions.submit_scenario(run_id, current, 'boss_fight');
         ctx.encounter_actions.resolve_encounter(
-            run_id, 6, 'skill', EncounterResult::Success, -10, 50, 0,
+            run_id, current, 'skill', EncounterResult::Success, -10, 50, 0,
         );
 
         let run: Run = ctx.world.read_model(run_id);
-        // Floor 1 boss beaten, should advance to floor 2
-        assert!(run.floor == 2, "should advance to floor 2");
-        assert!(run.score == 100, "should gain 100 score for clearing floor");
+        assert!(run.status == RunStatus::Completed, "run should be completed");
+        assert!(run.score == 100, "should gain 100 score for boss");
+
+        let cat: Cat = ctx.world.read_model(cat_id);
+        assert!(cat.runs_completed == 1, "runs_completed should be 1");
     }
 }

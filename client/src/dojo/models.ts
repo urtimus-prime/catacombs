@@ -26,8 +26,7 @@ export interface Run {
   cat_id: number;
   seed: string;
   current_node_id: number;
-  floor: number;
-  max_floors: number;
+  node_count: number;
   status: number; // 0=Active, 1=Completed, 2=Failed
   score: number;
   nodes_visited: number;
@@ -37,10 +36,14 @@ export interface Node {
   fieldOrder: string[];
   run_id: number;
   node_id: number;
-  floor: number;
-  node_type: number; // 0=Start,1=Combat,2=Treasure,3=Rest,4=Event,5=Shop,6=Boss
+  column: number;
+  row: number;
+  node_type: number; // 0=Start,1=Combat,2=Treasure,3=Rest,4=Event,5=Boss
   resolved: boolean;
   outcome_seed: string;
+  skill_tag_1: string;
+  skill_tag_2: string;
+  difficulty: number;
   connections: number;
 }
 
@@ -91,19 +94,20 @@ export const schema: SchemaType = {
     },
     Run: {
       fieldOrder: [
-        "id", "cat_id", "seed", "current_node_id", "floor",
-        "max_floors", "status", "score", "nodes_visited",
+        "id", "cat_id", "seed", "current_node_id", "node_count",
+        "status", "score", "nodes_visited",
       ],
       id: 0, cat_id: 0, seed: "0x0", current_node_id: 0,
-      floor: 0, max_floors: 0, status: 0, score: 0, nodes_visited: 0,
+      node_count: 0, status: 0, score: 0, nodes_visited: 0,
     },
     Node: {
       fieldOrder: [
-        "run_id", "node_id", "floor", "node_type", "resolved",
-        "outcome_seed", "connections",
+        "run_id", "node_id", "column", "row", "node_type", "resolved",
+        "outcome_seed", "skill_tag_1", "skill_tag_2", "difficulty", "connections",
       ],
-      run_id: 0, node_id: 0, floor: 0, node_type: 0,
-      resolved: false, outcome_seed: "0x0", connections: 0,
+      run_id: 0, node_id: 0, column: 0, row: 0, node_type: 0,
+      resolved: false, outcome_seed: "0x0", skill_tag_1: "0x0",
+      skill_tag_2: "0x0", difficulty: 0, connections: 0,
     },
     Encounter: {
       fieldOrder: [
@@ -129,6 +133,6 @@ export enum ModelsMapping {
   CatInventory = "catacombs-CatInventory",
 }
 
-export const NODE_TYPES = ["Start", "Combat", "Treasure", "Rest", "Event", "Shop", "Boss"] as const;
+export const NODE_TYPES = ["Start", "Combat", "Treasure", "Rest", "Event", "Boss"] as const;
 export const RUN_STATUS = ["Active", "Completed", "Failed"] as const;
 export const ENCOUNTER_RESULTS = ["Pending", "Success", "Partial", "Failure"] as const;

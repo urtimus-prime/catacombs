@@ -515,7 +515,7 @@ body::after {
   margin-bottom: 16px;
 }
 
-.map-floor {
+.map-score {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 400;
@@ -525,28 +525,31 @@ body::after {
 
 .map-container {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  padding: 24px 8px;
-  gap: 6px;
+  padding: 16px 4px;
+  gap: 4px;
   position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .map-column {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .node-btn {
-  width: 96px;
-  height: 64px;
+  width: 72px;
+  height: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
   cursor: default;
   transition: all 0.2s ease;
   border: 2px solid var(--stone-700);
@@ -556,24 +559,41 @@ body::after {
 }
 
 .node-btn .node-type {
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .node-btn .node-icon {
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
 }
 
-.node-btn .node-id {
-  font-size: 9px;
-  color: var(--stone-500);
+.node-btn .node-difficulty {
+  font-size: 7px;
+  line-height: 1;
+  color: var(--blood-400);
+  letter-spacing: -1px;
+}
+
+.node-btn .node-skills {
+  font-size: 7px;
+  color: var(--stone-400);
+  text-transform: lowercase;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Node states */
-.node-btn.dimmed { opacity: 0.25; }
+.node-btn.dimmed { opacity: 0.2; }
+
+.node-btn.visited {
+  opacity: 0.4;
+  border-color: var(--stone-600);
+}
 
 .node-btn.current {
   border-color: var(--amber-500);
@@ -608,9 +628,6 @@ body::after {
 
 .node-btn.type-Event { background: rgba(139, 92, 246, 0.08); }
 .node-btn.type-Event .node-type { color: var(--arcane-400); }
-
-.node-btn.type-Shop { background: rgba(59, 130, 246, 0.08); }
-.node-btn.type-Shop .node-type { color: var(--frost-400); }
 
 .node-btn.type-Boss { background: rgba(220, 38, 38, 0.15); }
 .node-btn.type-Boss .node-type { color: var(--blood-400); }
@@ -1190,25 +1207,31 @@ body::after {
 
   /* Map */
   .map-container {
-    padding: 12px 0;
-    gap: 3px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    padding: 8px 0;
+    gap: 2px;
   }
 
   .node-btn {
-    width: 56px;
-    height: 48px;
+    width: 48px;
+    height: 40px;
     border-width: 1.5px;
   }
 
   .node-btn .node-icon {
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .node-btn .node-type {
-    font-size: 8px;
+    font-size: 7px;
     letter-spacing: 0;
+  }
+
+  .node-btn .node-difficulty {
+    font-size: 6px;
+  }
+
+  .node-btn .node-skills {
+    display: none;
   }
 
   .map-hint {

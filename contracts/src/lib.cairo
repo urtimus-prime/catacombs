@@ -13,6 +13,7 @@ pub mod interfaces {
 
 pub mod helpers {
     pub mod random;
+    pub mod skills;
 }
 
 pub mod systems {

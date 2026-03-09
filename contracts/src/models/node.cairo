@@ -1,5 +1,5 @@
 // Nodes form the branching map of a catacomb run.
-// Each floor has multiple nodes connected in a DAG (like Slay the Spire).
+// The entire run is a single 10-column DAG (like Slay the Spire).
 // Players choose which node to visit next from available connections.
 
 #[derive(Serde, Copy, Drop, Introspect, Debug, PartialEq, DojoStore)]
@@ -9,8 +9,7 @@ pub enum NodeType {
     Treasure,
     Rest,
     Event,     // narrative choice / LLM scenario
-    Shop,
-    Boss,      // end of floor
+    Boss,      // end of run
 }
 
 impl NodeTypeDefault of Default<NodeType> {
@@ -26,12 +25,16 @@ pub struct Node {
     pub run_id: u64,
     #[key]
     pub node_id: u8,
-    pub floor: u8,
+    pub column: u8,
+    pub row: u8,
     pub node_type: NodeType,
     pub resolved: bool,
     pub outcome_seed: felt252,
+    pub skill_tag_1: felt252,
+    pub skill_tag_2: felt252,
+    pub difficulty: u8,
     // Connections stored as packed bits: bit N = connects to node N
-    // Supports up to 32 nodes per floor
+    // Supports up to 32 nodes per run
     pub connections: u32,
 }
 

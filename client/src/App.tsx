@@ -15,7 +15,7 @@ const CAT_VIEWER_BASE = import.meta.env.DEV
 
 const NODE_ICONS: Record<string, string> = {
   Start: "\u2302", Combat: "\u2694", Treasure: "\u2666",
-  Rest: "\u2665", Event: "\u2605", Shop: "\u2617", Boss: "\u2620",
+  Rest: "\u2665", Event: "\u2605", Boss: "\u2620",
 };
 
 interface TxLog {
@@ -34,12 +34,14 @@ interface CatState {
 
 interface RunState {
   id: number; cat_id: number; current_node_id: number;
-  floor: number; max_floors: number; status: number;
+  node_count: number; status: number;
   score: number; nodes_visited: number;
 }
 
 interface NodeState {
-  node_id: number; node_type: number; connections: number; resolved: boolean;
+  node_id: number; column: number; row: number; node_type: number;
+  connections: number; resolved: boolean;
+  skill_tag_1: string; skill_tag_2: string; difficulty: number;
 }
 
 // Appearance data matching the on-chain bit-packed felt252
@@ -144,15 +146,28 @@ function parseRun(r: any[]): RunState {
   const n = (i: number) => Number(BigInt(r[i]));
   return {
     id: n(0), cat_id: n(1), current_node_id: n(3),
-    floor: n(4), max_floors: n(5), status: n(6),
-    score: n(7), nodes_visited: n(8),
+    node_count: n(4), status: n(5),
+    score: n(6), nodes_visited: n(7),
   };
+}
+
+function felt252ToString(felt: string): string {
+  const hex = BigInt(felt).toString(16);
+  let s = "";
+  for (let i = 0; i < hex.length; i += 2) {
+    const code = parseInt(hex.substring(i, i + 2), 16);
+    if (code > 0) s += String.fromCharCode(code);
+  }
+  return s;
 }
 
 function parseNode(r: any[]): NodeState {
   const n = (i: number) => Number(BigInt(r[i]));
   return {
-    node_id: n(1), node_type: n(3), connections: n(6), resolved: !!n(4),
+    node_id: n(1), column: n(2), row: n(3), node_type: n(4),
+    resolved: !!n(5), connections: n(10),
+    skill_tag_1: felt252ToString(r[7]), skill_tag_2: felt252ToString(r[8]),
+    difficulty: n(9),
   };
 }
 
@@ -252,7 +267,7 @@ function App() {
           } catch {}
           found.push({ cat: parsed, appearance: app });
         }
-      } catch { break; }
+      } catch { continue; }
     }
     setCats(found);
     if (found.length > 0 && !selectedCatId) {
@@ -282,12 +297,31 @@ function App() {
       if (result && Number(BigInt(result[0])) > 0) {
         const r = parseRun(result);
         setRun(r);
-        const nodePromises = [];
-        for (let i = 0; i <= 6; i++) {
-          nodePromises.push(client.run_actions.get_node(runId, i));
+        // Fetch all nodes: IDs 0, then 1..((node_count-2)*1), then 25 (boss)
+        // Node IDs: 0 (start), 1..(node_count-2) for middle, 25 (boss)
+        const nodeIds: number[] = [];
+        for (let i = 0; i < r.node_count; i++) {
+          // We don't know exact IDs, but they're: 0, 1..N, 25
+          // Middle nodes use (col-1)*3+1+row, max ID is 25
+          // Safest: fetch all possible IDs 0-25
+          nodeIds.push(i);
         }
-        const nodeResults = await Promise.all(nodePromises);
-        setNodes(nodeResults.map(parseNode));
+        // Actually just fetch 0 through 25 and filter out empty ones
+        const allIds = Array.from({ length: 26 }, (_, i) => i);
+        const nodeResults = await Promise.all(
+          allIds.map(id => client.run_actions.get_node(runId, id).catch(() => null))
+        );
+        const parsed: NodeState[] = [];
+        for (const nr of nodeResults) {
+          if (nr) {
+            const node = parseNode(nr);
+            // Filter out uninitialized nodes (column=0 and row=0 and node_type=0 and node_id != 0)
+            if (node.node_id === 0 || node.column > 0 || node.node_type > 0) {
+              parsed.push(node);
+            }
+          }
+        }
+        setNodes(parsed);
       } else {
         setRun(null);
         setNodes([]);
@@ -647,10 +681,10 @@ function App() {
                   <>
                     <div className="stats-grid">
                       <StatCell label="Run" value={`#${run.id}`} />
-                      <StatCell label="Floor" value={`${run.floor}/${run.max_floors}`} />
+                      <StatCell label="Score" value={run.score} />
                       <StatCell label="Position" value={
                         run.current_node_id === 0 ? "Start" :
-                        run.current_node_id === 6 ? "Boss" :
+                        run.current_node_id === 25 ? "Boss" :
                         `Node ${run.current_node_id}`
                       } />
                       <StatCell label="Visited" value={run.nodes_visited} />
@@ -1126,6 +1160,8 @@ function CatCreator({ appearance, onChange, onConfirm, onCancel, pending }: {
   );
 }
 
+const DIFFICULTY_PIPS = ["", "\u2620", "\u2620\u2620", "\u2620\u2620\u2620"];
+
 function MapView({
   run, nodes, currentConnections, onChoosePath, pending,
 }: {
@@ -1135,40 +1171,61 @@ function MapView({
   onChoosePath: (nodeId: number) => void;
   pending: boolean;
 }) {
-  const columns = [[0], [1, 2], [3, 4], [5], [6]];
+  // Group nodes by column
+  const columns: NodeState[][] = [];
+  for (let col = 0; col <= 9; col++) {
+    const colNodes = nodes
+      .filter(n => n.column === col)
+      .sort((a, b) => a.row - b.row);
+    if (colNodes.length > 0) columns.push(colNodes);
+  }
+
+  // Build set of visited node IDs (resolved or current)
+  const visitedIds = new Set(
+    nodes.filter(n => n.resolved).map(n => n.node_id)
+  );
+  visitedIds.add(run.current_node_id);
 
   return (
     <div className="card">
       <div className="map-header">
         <h3 className="card-title" style={{ margin: 0 }}>Dungeon Map</h3>
-        <span className="map-floor">Floor {run.floor}/{run.max_floors}</span>
+        <span className="map-score">Score: {run.score}</span>
       </div>
       <div className="map-container">
-        {columns.map((col, colIdx) => (
+        {columns.map((colNodes, colIdx) => (
           <div key={colIdx} className="map-column">
-            {col.map((nodeId) => {
-              const node = nodes.find(n => n.node_id === nodeId);
-              const isCurrent = run.current_node_id === nodeId;
-              const isReachable = hasConnection(currentConnections, nodeId);
-              const typeName = node ? NODE_TYPES[node.node_type] : "?";
+            {colNodes.map((node) => {
+              const isCurrent = run.current_node_id === node.node_id;
+              const isReachable = hasConnection(currentConnections, node.node_id);
+              const isVisited = node.resolved;
+              const typeName = NODE_TYPES[node.node_type] ?? "?";
 
               const classes = [
                 "node-btn",
                 `type-${typeName}`,
                 isCurrent ? "current" : "",
                 isReachable && !isCurrent ? "reachable" : "",
-                !isCurrent && !isReachable ? "dimmed" : "",
+                isVisited && !isCurrent ? "visited" : "",
+                !isCurrent && !isReachable && !isVisited ? "dimmed" : "",
               ].filter(Boolean).join(" ");
 
               return (
                 <button
-                  key={nodeId}
+                  key={node.node_id}
                   className={classes}
-                  onClick={() => onChoosePath(nodeId)}
+                  onClick={() => onChoosePath(node.node_id)}
                   disabled={pending || !isReachable}
+                  title={node.skill_tag_1 ? `${node.skill_tag_1}${node.skill_tag_2 ? ` + ${node.skill_tag_2}` : ""}` : ""}
                 >
                   <span className="node-icon">{NODE_ICONS[typeName] ?? "?"}</span>
                   <span className="node-type">{typeName}</span>
+                  {node.difficulty > 0 && (
+                    <span className="node-difficulty">{DIFFICULTY_PIPS[node.difficulty]}</span>
+                  )}
+                  {node.skill_tag_1 && (
+                    <span className="node-skills">{node.skill_tag_1}{node.skill_tag_2 ? ` ${node.skill_tag_2}` : ""}</span>
+                  )}
                 </button>
               );
             })}

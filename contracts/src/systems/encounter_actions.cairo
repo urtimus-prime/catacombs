@@ -174,29 +174,20 @@ pub mod encounter_actions {
                 );
             }
 
-            // Check if boss defeated -> advance floor or complete run
+            // Check if boss defeated with success -> run completed
             if node.node_type == NodeType::Boss && result != EncounterResult::Failure {
-                run.score += 100; // bonus for clearing floor
+                run.score += 100;
+                run.status = RunStatus::Completed;
+                cat.runs_completed += 1;
 
-                if run.floor >= run.max_floors {
-                    run.status = RunStatus::Completed;
-                    cat.runs_completed += 1;
-
-                    world.emit_event(
-                        @RunCompleted {
-                            run_id,
-                            cat_id: run.cat_id,
-                            score: run.score,
-                            status: RunStatus::Completed,
-                        },
-                    );
-                } else {
-                    // Next floor
-                    run.floor += 1;
-                    run.current_node_id = 0;
-                    // Generate next floor map
-                    // TODO: call generate_floor from run_actions
-                }
+                world.emit_event(
+                    @RunCompleted {
+                        run_id,
+                        cat_id: run.cat_id,
+                        score: run.score,
+                        status: RunStatus::Completed,
+                    },
+                );
             }
 
             world.write_model(@cat);

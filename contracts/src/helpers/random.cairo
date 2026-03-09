@@ -16,6 +16,11 @@ pub impl RandomImpl of RandomTrait {
         Random { seed, nonce: 0 }
     }
 
+    /// Create a deterministic RNG from just a seed (no tx_hash).
+    fn new_deterministic(seed: felt252) -> Random {
+        Random { seed, nonce: 0 }
+    }
+
     /// Advance the RNG and return the next seed.
     fn next_seed(ref self: Random) -> felt252 {
         self.nonce += 1;
